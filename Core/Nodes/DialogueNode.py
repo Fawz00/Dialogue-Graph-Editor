@@ -1,6 +1,7 @@
 from PyQt6.QtGui import QColor
 
 from Core.BaseNode import BaseNode
+from Core.Enums.DataType import DataType
 
 class DialogueNode(BaseNode):
     def __init__(self):
@@ -9,7 +10,7 @@ class DialogueNode(BaseNode):
         self.npc_text = "Hello Traveler!"
         self.choices = ["Next"]
         
-        self.add_socket(True, "exec") # Input flow
+        self.add_socket(True, True) # Input flow
         self.refresh_outputs()
 
     def refresh_outputs(self):
@@ -21,12 +22,12 @@ class DialogueNode(BaseNode):
         
         # Buat socket baru berdasarkan pilihan
         for choice in self.choices:
-            self.add_socket(False, "exec", choice)
+            self.add_socket(False, True, label=choice)
 
     def get_properties(self):
         return {
-            "NPC Text": {"type": "text", "value": self.npc_text},
-            "Choices": {"type": "list", "value": ",".join(self.choices)} # Simpel: comma separated
+            "NPC Text": {"type": DataType.STRING, "value": self.npc_text},
+            "Choices": {"type": DataType.STRING, "value": ",".join(self.choices)} # Simpel: comma separated
         }
 
     def set_property(self, key, value):

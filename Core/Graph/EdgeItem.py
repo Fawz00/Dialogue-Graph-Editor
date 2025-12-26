@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (QGraphicsPathItem)
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QPen, QPainterPath
 
-from Style import STYLES, TYPE_COLORS
+from Core.Enums.DataType import DataType
+from Style import STYLES, DATA_TYPE_COLORS
 
 class EdgeItem(QGraphicsPathItem):
     def __init__(self, start_socket, end_socket=None, cur_mouse_pos=None):
@@ -28,12 +29,12 @@ class EdgeItem(QGraphicsPathItem):
         
         path.cubicTo(ctrl1, ctrl2, end_pos)
         self.setPath(path)
-
+        
         # Style garis
-        color = TYPE_COLORS.get(self.start_socket.socket_type, Qt.GlobalColor.white)
+        color = DATA_TYPE_COLORS.get(DataType(self.start_socket.data_type), Qt.GlobalColor.white) if not self.start_socket.is_exec else STYLES['socket_exec']
         
         # Kabel EXEC lebih tebal (3px), Kabel DATA lebih tipis (2px)
-        width = 3 if self.start_socket.socket_type == "exec" else 2
+        width = 3 if self.start_socket.is_exec else 2
         
         pen = QPen(color, width)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap) # Membuat ujung kabel tumpul/rapi

@@ -76,6 +76,7 @@ class GraphView(QGraphicsView):
             if sel_items and isinstance(sel_items[0], BaseNode):
                 self.main_window.properties_panel.load_node(sel_items[0])
             else:
+                self.main_window.properties_panel.load_node(None)
                 self.main_window.properties_panel.clear()
     
     def mouseDoubleClickEvent(self, event):
@@ -107,8 +108,8 @@ class GraphView(QGraphicsView):
             # 1. Jika dilepas di atas socket (Koneksi Langsung)
             if isinstance(item, SocketItem):
                 if self.is_connection_allowed(out_sock, item):
-                    if out_sock.is_input: self.create_edge(item, out_sock)
-                    else: self.create_edge(out_sock, item)
+                    if out_sock.is_input: item.connect_to(out_sock)
+                    else: out_sock.connect_to(item)
                 
                 # Hapus kabel sementara karena sudah jadi kabel permanen
                 self.scene().removeItem(self.scene().temp_edge)
@@ -213,66 +214,6 @@ class GraphView(QGraphicsView):
             self.main_window.properties_panel.clear()
     
     # --- Helpers ---
-
-    def create_edge(self, start_sock, end_sock):
-        """
-        Aturan yang diterapkan:
-        1. Output Exec: SINGLE
-        2. Input Exec:  MULTI (Banyak kabel bisa masuk)
-        3. Output Data: MULTI
-        4. Input Data:  SINGLE
-        """
-
-        # --- Logika Adaptasi Reroute ---
-        # Jika salah satu socket milik RerouteNode, samakan tipenya
-        if hasattr(start_sock.parent_node, 'is_reroute'):
-            start_sock.parent_node.sync_type(end_sock.socket_type)
-        elif hasattr(end_sock.parent_node, 'is_reroute'):
-            end_sock.parent_node.sync_type(start_sock.socket_type)
-        
-        # --- LOGIKA SINGLE CONNECTION (PEMBERSIHAN) ---
-        
-        # Jika START (Output) adalah Exec, dia harus single. 
-        # Putuskan kabel lama yang keluar dari dia.
-        if not start_sock.is_input and start_sock.socket_type == "exec":
-            self.clear_socket_connections(start_sock)
-
-        # Jika END (Input) adalah Data (Bukan Exec), dia harus single.
-        # Putuskan kabel lama yang masuk ke dia.
-        if end_sock.is_input and end_sock.socket_type != "exec":
-            self.clear_socket_connections(end_sock)
-
-        # Fitur Tambahan: Jika salah satu adalah Reroute, sesuaikan tipenya
-        if hasattr(start_sock.parent_node, 'is_reroute'):
-            start_sock.parent_node.update_type(end_sock.socket_type)
-        elif hasattr(end_sock.parent_node, 'is_reroute'):
-            end_sock.parent_node.update_type(start_sock.socket_type)
-
-        # --- PEMBUATAN EDGE BARU ---
-        edge = EdgeItem(start_sock, end_sock)
-        self.scene().addItem(edge)
-        
-        # Simpan referensi ke daftar edges di masing-masing socket
-        start_sock.edges.append(edge)
-        end_sock.edges.append(edge)
-        
-        return edge
-    
-    def clear_socket_connections(self, socket):
-        """Menghapus kabel yang menempel pada satu socket tertentu"""
-        for edge in socket.edges[:]:
-            # Cari socket di ujung satunya agar kita bisa hapus referensi di sana juga
-            other_sock = edge.start_socket if edge.end_socket == socket else edge.end_socket
-            if other_sock and edge in other_sock.edges:
-                other_sock.edges.remove(edge)
-            
-            # Hapus dari socket ini
-            if edge in socket.edges:
-                socket.edges.remove(edge)
-            
-            # Hapus visual dari scene
-            if edge.scene():
-                self.scene().removeItem(edge)
     
     def show_context_menu_at_drop(self, global_pos, scene_pos):
         """Dipanggil saat kabel dilepas di area kosong"""
@@ -292,14 +233,14 @@ class GraphView(QGraphicsView):
             new_node = RerouteNode()
 
             start_sock = self.scene().start_socket
-            new_node = RerouteNode(start_sock.socket_type)
+            new_node = RerouteNode(start_sock.is_exec, start_sock.data_type) if hasattr(start_sock.parent_node, 'is_reroute') else RerouteNode()
             self.spawn_node(new_node, scene_pos)
             
             # Hubungkan otomatis
             if start_sock.is_input:
-                self.create_edge(new_node.out_socket, start_sock)
+                new_node.out_socket.connect_to(start_sock)
             else:
-                self.create_edge(start_sock, new_node.in_socket)
+                start_sock.connect_to(new_node.in_socket)
             
             return
 
@@ -313,9 +254,9 @@ class GraphView(QGraphicsView):
             for target_sock in target_sockets:
                 if self.is_connection_allowed(start_sock, target_sock):
                     if start_sock.is_input:
-                        self.create_edge(target_sock, start_sock)
+                        target_sock.connect_to(start_sock)
                     else:
-                        self.create_edge(start_sock, target_sock)
+                        start_sock.connect_to(target_sock)
                     break
     
     def is_connection_allowed(self, out_sock, in_sock):
@@ -324,7 +265,9 @@ class GraphView(QGraphicsView):
         if out_sock.parent_node == in_sock.parent_node: return False
         
         # Strict Typing: Exec hanya ke Exec, Data hanya ke Data yang tipenya sama
-        if out_sock.socket_type != in_sock.socket_type:
+        if out_sock.is_exec != in_sock.is_exec:
+            return False
+        if (out_sock.is_exec == in_sock.is_exec == False) and (out_sock.data_type != in_sock.data_type):
             return False
             
         return True
@@ -338,7 +281,7 @@ class GraphView(QGraphicsView):
         
         # 2. Menu Set Variable (dengan Sub-menu)
         set_var_menu = menu.addMenu("Add Set Variable")
-        variables = self.main_window.var_manager.variables
+        variables = self.main_window.var_manager.global_variables
         
         if not variables:
             set_var_menu.setEnabled(False)
@@ -369,10 +312,11 @@ class GraphView(QGraphicsView):
         """Menyisipkan reroute node di tengah kabel"""
         start_socket = edge.start_socket
         end_socket = edge.end_socket
-        s_type = start_socket.socket_type
+        s_exec = start_socket.is_exec
+        s_type = start_socket.data_type
 
         # 1. Buat Reroute Node baru
-        reroute = RerouteNode(s_type)
+        reroute = RerouteNode(is_exec=s_exec, socket_data_type=s_type)
         reroute.setPos(pos.x() - 10, pos.y() - 10)
         self.scene().addItem(reroute)
 
@@ -382,5 +326,5 @@ class GraphView(QGraphicsView):
         end_socket.edges.remove(edge)
 
         # 3. Buat dua kabel baru (Sambungkan Start -> Reroute -> End)
-        self.create_edge(start_socket, reroute.in_socket)
-        self.create_edge(reroute.out_socket, end_socket)
+        start_socket.connect_to(reroute.in_socket)
+        reroute.out_socket.connect_to(end_socket)

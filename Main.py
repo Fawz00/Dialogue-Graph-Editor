@@ -75,7 +75,7 @@ class MainWindow(QMainWindow):
         self.dock_props.setObjectName("PropertiesDock")
         self.dock_props.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         
-        self.properties_panel = PropertiesPanel()
+        self.properties_panel = PropertiesPanel(self)
         self.dock_props.setWidget(self.properties_panel)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
     
@@ -186,6 +186,7 @@ class MainWindow(QMainWindow):
                 if item.selected_var == old_name:
                     item.selected_var = new_name
                     item.set_property("Variable", new_name)
+                    item.update_sockets_by_variable(new_name)
                 self.validate_node_connections(item)
 
         # 2. REFRESH PANEL DETAILS
@@ -220,15 +221,15 @@ class MainWindow(QMainWindow):
     def validate_node_connections(self, node):
         """Memutus kabel jika tipe data socket berubah dan tidak cocok dengan kabelnya"""
         for socket in node.inputs + node.outputs:
-            if socket.socket_type == "exec": continue # Lewati alur eksekusi
+            if socket.is_exec:
+                continue # Lewati alur eksekusi
             
             for edge in socket.edges[:]:
                 # Ambil socket lawan
                 other_socket = edge.start_socket if edge.end_socket == socket else edge.end_socket
-                
+
                 # Jika tipe data sudah tidak sama, putus koneksinya!
-                if socket.socket_type != other_socket.socket_type:
-                    print(f"Disconnecting incompatible link: {socket.socket_type} vs {other_socket.socket_type}")
+                if socket.data_type != other_socket.data_type:
                     self.view.clear_socket_connections(socket)
 
 if __name__ == '__main__':

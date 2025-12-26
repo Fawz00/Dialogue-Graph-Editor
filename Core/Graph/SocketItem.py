@@ -1,16 +1,20 @@
 from PyQt6.QtWidgets import (QGraphicsItem)
 from PyQt6.QtCore import Qt, QRectF
 from PyQt6.QtGui import QBrush, QFont, QPainterPath, QPen, QColor
+from typing import cast
 
-from Style import STYLES, TYPE_COLORS
+from Core.Enums.DataType import DataType
+from Core.Graph.EdgeItem import EdgeItem
+from Style import STYLES, DATA_TYPE_COLORS
 
 class SocketItem(QGraphicsItem):
-    def __init__(self, parent_node, index, is_input=True, socket_type="exec", label=""):
+    def __init__(self, parent_node, index, is_input=True, is_exec=True, data_type=None, label=""):
         super().__init__(parent_node)
         self.parent_node = parent_node
         self.index = index
         self.is_input = is_input
-        self.socket_type = socket_type  # "exec", "string", "int", etc.
+        self.is_exec = is_exec
+        self.data_type = data_type
         self.label = label
         self.collision_radius = 8
         self.radius = 6
@@ -25,13 +29,13 @@ class SocketItem(QGraphicsItem):
 
     def paint(self, painter, option, widget):
         # Ambil warna berdasarkan tipe data
-        color = TYPE_COLORS.get(self.socket_type, QColor(200, 200, 200))
+        color = DATA_TYPE_COLORS.get(DataType(self.data_type), QColor(150, 150, 150)) if not self.is_exec else STYLES['socket_exec']
         
         painter.setBrush(QBrush(color))
         painter.setPen(QPen(Qt.GlobalColor.black, 1))
         
         # Gambar bentuk Polygon (Segitiga/Pentagon) jika EXEC, Lingkaran jika DATA
-        if self.socket_type == "exec":
+        if self.is_exec:
             path = QPainterPath()
             path.moveTo(-5, -5)
             path.lineTo(5, 0)
@@ -51,3 +55,83 @@ class SocketItem(QGraphicsItem):
 
     def get_scene_pos(self):
         return self.mapToScene(0, 0)
+    
+    def connect_to(self, target_sock):
+        """
+        Aturan yang diterapkan:
+        1. Output Exec: SINGLE
+        2. Input Exec:  MULTI (Banyak kabel bisa masuk)
+        3. Output Data: MULTI
+        4. Input Data:  SINGLE
+        """
+        current_sock = self
+
+        # Note: `start_sock.parent_node` type == RerouteNode
+
+        # --- Logika Adaptasi Reroute ---
+        # Jika salah satu socket milik RerouteNode, samakan tipenya
+        if hasattr(current_sock.parent_node, 'is_reroute'):
+            current_sock.parent_node.sync_type(target_sock.is_exec, target_sock.data_type)
+        elif hasattr(target_sock.parent_node, 'is_reroute'):
+            target_sock.parent_node.sync_type(current_sock.is_exec, current_sock.data_type)
+        
+        # --- LOGIKA SINGLE CONNECTION (PEMBERSIHAN) ---
+        
+        # Jika START (Output) adalah Exec, dia harus single. 
+        # Putuskan kabel lama yang keluar dari dia.
+        if not current_sock.is_input and current_sock.is_exec:
+            current_sock.clear_connections()
+
+        # Jika END (Input) adalah Data (Bukan Exec), dia harus single.
+        # Putuskan kabel lama yang masuk ke dia.
+        if target_sock.is_input and not target_sock.is_exec:
+            target_sock.clear_connections()
+
+        # Fitur Tambahan: Jika salah satu adalah Reroute, sesuaikan tipenya
+        if hasattr(current_sock.parent_node, 'is_reroute'):
+            current_sock.parent_node.update_type(target_sock.is_exec, target_sock.data_type)
+        elif hasattr(target_sock.parent_node, 'is_reroute'):
+            target_sock.parent_node.update_type(current_sock.is_exec, current_sock.data_type)
+
+        # --- PEMBUATAN EDGE BARU ---
+        edge = EdgeItem(current_sock, target_sock)
+        self.scene().addItem(edge)
+        
+        # Simpan referensi ke daftar edges di masing-masing socket
+        current_sock.edges.append(edge)
+        target_sock.edges.append(edge)
+        
+        return edge
+
+    def clear_connections(self):
+        """Menghapus kabel yang menempel pada satu socket tertentu"""
+        for edge in self.edges[:]:
+            # Cari socket di ujung satunya agar kita bisa hapus referensi di sana juga
+            other_sock = edge.start_socket if edge.end_socket == self else edge.end_socket
+            if other_sock and edge in other_sock.edges:
+                other_sock.edges.remove(edge)
+            
+            # Hapus dari socket ini
+            if edge in self.edges:
+                self.edges.remove(edge)
+            
+            # Hapus visual dari scene
+            if edge.scene():
+                self.scene().removeItem(edge)
+
+    def destroy(self):
+        # Hapus semua edge yang terhubung
+        for edge in self.edges[:]:
+            edge = cast('EdgeItem', edge)
+            if edge in edge.start_socket.edges:
+                edge.start_socket.edges.remove(edge)
+            if edge in edge.end_socket.edges:
+                edge.end_socket.edges.remove(edge)
+            if edge.scene():
+                edge.scene().removeItem(edge)
+        
+        self.edges.clear()
+        
+        # Hapus socket dari scene jika masih ada
+        if self.scene() is not None:
+            self.scene().removeItem(self)

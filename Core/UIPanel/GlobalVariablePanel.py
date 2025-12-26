@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLi
                              QPushButton, QComboBox, QTreeWidget, QTreeWidgetItem, QMenu)
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 
+from Core.Enums.DataType import DataType
 from Core.Nodes.SetVarNode import SetVarNode
 from Core.VariableManager import VariableManager
 from Core.UIPanel.Utils.TypeDelegate import TypeDelegate
@@ -48,16 +49,16 @@ class GlobalVariablePanel(QWidget):
         if not name: return
         
         # Validasi: Cek apakah nama sudah ada
-        if name in self.manager.variables:
+        if name in self.manager.global_variables:
             QMessageBox.warning(self, "Duplicate Name", f"Variable with name '{name}' already exists!")
             self.name_edit.setStyleSheet("background-color: #ffcccc;") # Feedback merah
             return
 
         self.name_edit.setStyleSheet("") # Reset style jika berhasil
         v_type = self.type_combo.currentText()
-        default_val = VariableManager.VAR_CONFIG[v_type]
+        default_val = VariableManager.DEFAULT_VALUES[DataType(v_type)]
         
-        self.manager.variables[name] = {'type': v_type, 'value': default_val}
+        self.manager.global_variables[name] = {'type': v_type, 'value': default_val}
         
         item = QTreeWidgetItem([name, v_type, str(default_val)])
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
@@ -79,8 +80,8 @@ class GlobalVariablePanel(QWidget):
         )
         
         if confirm == QMessageBox.StandardButton.Yes:
-            if var_name in self.manager.variables:
-                del self.manager.variables[var_name]
+            if var_name in self.manager.global_variables:
+                del self.manager.global_variables[var_name]
                 # Emit signal agar Graph & Details ikut update
                 self.manager.variable_deleted.emit(var_name)
             
@@ -94,8 +95,9 @@ class GlobalVariablePanel(QWidget):
         self.tree.blockSignals(True)
         
         row_idx = self.tree.indexOfTopLevelItem(item)
+
         # Ambil list keys untuk mencari nama lama berdasarkan urutan row
-        all_keys = list(self.manager.variables.keys())
+        all_keys = list(self.manager.global_variables.keys())
         if row_idx >= len(all_keys): 
             self.tree.blockSignals(False)
             return
@@ -110,39 +112,40 @@ class GlobalVariablePanel(QWidget):
             if new_name == "":
                 item.setText(0, old_name) # Kembalikan jika kosong
                 new_name = old_name
-            elif new_name != old_name and new_name in self.manager.variables:
+            elif new_name != old_name and new_name in self.manager.global_variables:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 item.setText(0, old_name) # Reset ke nama lama di visual
                 new_name = old_name
             
         # --- LOGIKA KONVERSI (Seperti sebelumnya) ---
-        # ... (Gunakan logika konversi VAR_CONFIG yang kita buat tadi) ...
+        # ... (Gunakan logika konversi DEFAULT_VALUES yang kita buat tadi) ...
         # Misal:
-        converted_val = VariableManager.VAR_CONFIG[new_type]
+        converted_val = VariableManager.DEFAULT_VALUES[DataType(new_type)]
         try:
-            if new_type == "Integer": converted_val = int(float(new_val_str))
-            elif new_type == "Float": converted_val = float(new_val_str)
-            elif new_type == "Boolean": converted_val = new_val_str in ("1", "True", "Yes", "true", "yes", "T", "Y", "t", "y")
-            elif new_type == "String": converted_val = new_val_str
+            if DataType(new_type) == DataType.INT: converted_val = int(float(new_val_str))
+            elif DataType(new_type) == DataType.FLOAT: converted_val = float(new_val_str)
+            elif DataType(new_type) == DataType.BOOL: converted_val = new_val_str in ("1", "True", "Yes", "true", "yes", "T", "Y", "t", "y")
+            elif DataType(new_type) == DataType.STRING: converted_val = new_val_str
             # dst...
         except:
             pass
-        
         item.setText(2, str(converted_val))
 
         # --- UPDATE MANAGER ---
         if old_name != new_name:
             # Pindahkan data ke key baru
-            self.manager.variables[new_name] = self.manager.variables.pop(old_name)
-            self.manager.variables[new_name]['type'] = new_type
-            self.manager.variables[new_name]['value'] = converted_val
+            self.manager.global_variables[new_name] = self.manager.global_variables.pop(old_name)
+            self.manager.global_variables[new_name]['type'] = new_type
+            self.manager.global_variables[new_name]['value'] = converted_val
 
             # Emit signal update
             self.manager.variable_updated.emit(old_name, new_name)
         else:
             # Update tipe/value saja
-            self.manager.variables[old_name]['type'] = new_type
-            self.manager.variables[old_name]['value'] = converted_val
+            self.manager.global_variables[old_name]['type'] = new_type
+            self.manager.global_variables[old_name]['value'] = converted_val
+
+            # Emit signal update dengan nama lama (karena tidak berubah)
             self.manager.variable_updated.emit(old_name, old_name)
 
         self.tree.blockSignals(False)

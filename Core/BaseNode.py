@@ -80,8 +80,8 @@ class BaseNode(QGraphicsItem):
         painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         painter.drawText(QRectF(10, 0, self.width-20, 30), Qt.AlignmentFlag.AlignVCenter, self.title)
 
-    def add_socket(self, is_input, socket_type="exec", label=""):
-        socket = SocketItem(self, len(self.inputs) if is_input else len(self.outputs), is_input, socket_type, label)
+    def add_socket(self, is_input, is_exec=True, data_type=None, label=""):
+        socket = SocketItem(self, len(self.inputs) if is_input else len(self.outputs), is_input, is_exec=is_exec, data_type=data_type, label=label)
         if is_input:
             self.inputs.append(socket)
         else:
@@ -96,8 +96,9 @@ class BaseNode(QGraphicsItem):
         if socket in self.outputs:
             self.outputs.remove(socket)
         
-        if socket.scene():
-            socket.scene().removeItem(socket)
+        socket.destroy()
+        
+        self.update_socket_positions()
 
     def update_socket_positions(self):
         # Hitung tinggi node berdasarkan jumlah socket
@@ -124,6 +125,10 @@ class BaseNode(QGraphicsItem):
                     edge.update_path()
         return super().itemChange(change, value)
 
+    def refresh(self):
+        """Override ini untuk memperbarui tampilan atau data internal node"""
+        pass
+
     def get_properties(self):
         """Override ini untuk menampilkan properti di panel samping"""
         return {}
@@ -131,3 +136,12 @@ class BaseNode(QGraphicsItem):
     def set_property(self, key, value):
         """Override ini untuk menerima update dari panel samping"""
         pass
+    
+    def serialize(self):
+        """Mengubah node menjadi dict untuk disimpan"""
+        return {
+            "title": self.title,
+            "pos": (self.pos().x(), self.pos().y()),
+            "type": self.__class__.__name__,
+            # Tambahkan properti lain sesuai kebutuhan
+        }

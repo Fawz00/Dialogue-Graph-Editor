@@ -1,57 +1,64 @@
 import sys
-from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, 
-                             QComboBox, QFormLayout)
+from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QFormLayout, QVBoxLayout,
+                             QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox)
+
+from Core.Enums.DataType import DataType
+from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
 
 class PropertiesPanel(QWidget):
-    def __init__(self):
+    def __init__(self, main_window):
         super().__init__()
-        self.layout = QFormLayout()
-        self.setLayout(self.layout)
+        self.main_window = main_window
+        self.layout = QVBoxLayout(self)
         self.current_node = None
 
     def clear(self):
-        self.current_node = None
-        if self.layout is not None:
-            while self.layout.count() > 0:
-                # Ambil baris terakhir dan hapus
-                self.layout.removeRow(0)
-        self.update() # Paksa refresh visual
+        # Bersihkan layout
+        while self.layout.count():
+            child = self.layout.takeAt(0)
+            if child.widget(): child.widget().deleteLater()
 
     def load_node(self, node):
-        self.clear()
         self.current_node = node
-        
-        props = node.get_properties()
-        
-        label_type = QLabel(f"Type: {node.title}")
-        label_type.setStyleSheet("font-weight: bold; color: orange;")
-        self.layout.addRow(label_type)
+        self.refresh()
 
-        for key, data in props.items():
-            if data['type'] == 'text':
-                widget = QLineEdit(str(data['value']))
-                widget.textChanged.connect(lambda val, k=key: self.update_node(k, val))
-                self.layout.addRow(key, widget)
-            elif data['type'] == 'list':
-                widget = QLineEdit(str(data['value']))
-                widget.setPlaceholderText("comma, separated, choices")
-                widget.textChanged.connect(lambda val, k=key: self.update_node(k, val))
-                self.layout.addRow(key, widget)
-            elif data['type'] == 'enum':
-                widget = QComboBox()
-                widget.addItems(data['options'])
-                widget.setCurrentText(data['value'])
-                widget.currentTextChanged.connect(lambda val, k=key: self.update_node(k, val))
-                self.layout.addRow(key, widget)
-
-    def update_node(self, key, value):
+    def update_prop(self, key, value):
         if self.current_node:
             self.current_node.set_property(key, value)
-            self.current_node.update() # Paksa redraw node
     
     def refresh(self):
-        """Memuat ulang UI jika ada perubahan data eksternal (seperti rename variabel)"""
-        if self.current_node:
-            # Simpan referensi node, bersihkan UI, lalu muat ulang
-            node = self.current_node
-            self.load_node(node)
+        # Bersihkan layout
+        self.clear()
+            
+        if not self.current_node: return
+        
+        # Ambil schema dari node
+        schema = self.current_node.get_properties()
+        for key, config in schema.items():
+            widget = self.create_property_widget(key, config)
+            self.layout.addWidget(widget)
+        self.layout.addStretch()
+    
+    def create_property_widget(self, key, config):
+        """Factory untuk membuat widget berdasarkan tipe data"""
+        t = config.get("type")
+        val = config.get("value")
+        
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 2, 0, 2)
+
+        # --- LOGIKA MAPPING TIPE KE WIDGET ---
+        
+        widget = PropertyWidgetFactory.create(
+            layout,
+            t,
+            key,
+            val,
+            lambda v, k=key: self.update_prop(k, v),
+            config.get("options")
+        )
+        if t == DataType.STRUCT and widget:
+            return widget  # Sudah return GroupBox langsung
+
+        return container
