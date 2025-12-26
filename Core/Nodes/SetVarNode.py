@@ -97,14 +97,6 @@ class SetVarNode(BaseNode):
 
     def update_sockets_by_variable(self, var_name):
         """Membangun ulang atau menghapus socket data berdasarkan variabel"""
-        # Hapus socket data lama jika ada
-        if self.in_data:
-            self.remove_socket(self.in_data)
-            self.in_data = None
-        if self.out_data:
-            self.remove_socket(self.out_data)
-            self.out_data = None
-
         self.selected_var = var_name
         var_info = self.var_manager.global_variables.get(var_name)
 
@@ -112,8 +104,17 @@ class SetVarNode(BaseNode):
             # Jika variabel valid, buat kembali socket datanya
             v_type = var_info['type']
             self.title = f"Set {var_name}"
-            self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type})")
-            self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type})")
+
+            if self.in_data is None:
+                self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type})")
+            else:
+                self.in_data = self.change_socket(self.in_data, is_exec=False, data_type=v_type)
+            
+            if self.out_data is None:
+                self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type})")
+            else:
+                self.out_data = self.change_socket(self.out_data, is_exec=False, data_type=v_type)
+            
             self.is_valid = True
 
             self.in_data.update() # Refresh visual socket

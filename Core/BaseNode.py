@@ -2,6 +2,7 @@ import sys
 from PyQt6.QtWidgets import (QGraphicsItem, QSizePolicy)
 from PyQt6.QtCore import Qt, QRectF
 from PyQt6.QtGui import QPen, QPainterPath, QFont
+from typing import cast
 
 from Style import STYLES
 from Core.Graph.SocketItem import SocketItem
@@ -86,6 +87,12 @@ class BaseNode(QGraphicsItem):
             self.inputs.append(socket)
         else:
             self.outputs.append(socket)
+        self.update_socket_positions()
+        return socket
+
+    def change_socket(self, socket, is_exec=True, data_type=None, label=""):
+        """Mengganti properti socket tanpa menghapusnya"""
+        socket.change_type(is_exec=is_exec, data_type=data_type, label=label)
         self.update_socket_positions()
         return socket
 

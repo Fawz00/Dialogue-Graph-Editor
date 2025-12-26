@@ -56,6 +56,18 @@ class SocketItem(QGraphicsItem):
     def get_scene_pos(self):
         return self.mapToScene(0, 0)
     
+    def change_type(self, is_exec, data_type, label=""):
+        """Mengganti properti socket tanpa menghapusnya"""
+
+        if self.is_exec != is_exec or self.data_type != data_type:
+            # Putuskan semua koneksi yang ada karena tipenya berubah
+            self.clear_connections()
+
+        self.is_exec = is_exec
+        self.data_type = data_type if not is_exec else None
+        self.label = label if label != "" else self.label
+        self.update()
+    
     def connect_to(self, target_sock):
         """
         Aturan yang diterapkan:
@@ -106,20 +118,30 @@ class SocketItem(QGraphicsItem):
     def clear_connections(self):
         """Menghapus kabel yang menempel pada satu socket tertentu"""
         for edge in self.edges[:]:
+            self.remove_connections(edge)
+    
+    def remove_connections(self, edge):
+        """Menghapus referensi edge tertentu dari socket ini"""
+        if edge in self.edges:
             # Cari socket di ujung satunya agar kita bisa hapus referensi di sana juga
             other_sock = edge.start_socket if edge.end_socket == self else edge.end_socket
             if other_sock and edge in other_sock.edges:
                 other_sock.edges.remove(edge)
             
             # Hapus dari socket ini
-            if edge in self.edges:
-                self.edges.remove(edge)
+            self.edges.remove(edge)
             
             # Hapus visual dari scene
             if edge.scene():
                 self.scene().removeItem(edge)
 
     def destroy(self):
+        # Hapus referensi node induk
+        if self.parent_node:
+            self.parent_node.inputs = [s for s in self.parent_node.inputs if s != self]
+            self.parent_node.outputs = [s for s in self.parent_node.outputs if s != self]
+            self.parent_node = None
+
         # Hapus semua edge yang terhubung
         for edge in self.edges[:]:
             edge = cast('EdgeItem', edge)
