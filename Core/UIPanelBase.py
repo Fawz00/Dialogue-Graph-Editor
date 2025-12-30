@@ -6,7 +6,7 @@ class UIPanelBase(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-        self.var_manager = main_window.var_manager
+        self.var_manager: VariableManager = main_window.var_manager
         self.layout = QVBoxLayout(self)
 
     def clear(self):

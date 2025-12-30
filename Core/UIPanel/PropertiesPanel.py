@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QFormLayout, QVBoxLayout,
-                             QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox)
+                             QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox, QMessageBox)
 
 from Core.UIPanelBase import UIPanelBase
 from Core.Enums.DataType import DataType
@@ -48,34 +48,37 @@ class PropertiesPanel(UIPanelBase):
             self.target_data["obj"].set_property(key, value)
             self.refresh()
         elif self.target_data["type"] == "global_var":
-            var_name = self.target_data["name"]
-            var_data = self.var_manager.global_variables[var_name]
+            old_name = self.target_data["name"]
+            old_data = self.var_manager.global_variables.get(old_name)
             
-            new_name = var_name
-            new_type = var_data["type"]
-            new_value = var_data["value"]
+            new_name = old_name
+            new_type = DataType(old_data["type"]).value
+            new_value = old_data["value"]
 
             if key == "Name":
                 new_name = value
-                self.target_data["name"] = new_name
-                self.var_manager.edit_variable(
-                    var_name,
-                    new_name=new_name
-                )
             elif key == "Type":
-                new_type = DataType(value)
-                self.var_manager.edit_variable(
-                    var_name,
-                    new_type=new_type
-                )
+                new_type = value
             elif key == "Default Value":
                 new_value = value
-                self.var_manager.edit_variable(
-                    var_name,
-                    new_value=new_value
-                )
+            
+            # Validasi
+            if new_name == "":
+                new_name = old_name
+            elif new_name != old_name and new_name in self.var_manager.global_variables:
+                QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
+                new_name = old_name
+            
+            old_type_str = str(DataType(old_data['type']).value) if not isinstance(old_data['type'], str) else old_data['type']
+            if new_type != old_type_str:
+                new_value = VariableManager.get_default_value(DataType(new_type))
 
-            self.refresh()
+            self.var_manager.edit_variable(
+                old_name,
+                new_name=new_name,
+                new_type=DataType(new_type),
+                new_value=new_value
+            )
     
     def refresh(self):
         # Bersihkan layout

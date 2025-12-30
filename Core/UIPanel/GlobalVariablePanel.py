@@ -118,7 +118,7 @@ class GlobalVariablePanel(UIPanelBase):
 
         self.name_edit.setStyleSheet("") # Reset style jika berhasil
         v_type = self.type_combo.currentText()
-        default_val = VariableManager.DEFAULT_VALUES[DataType(v_type)]
+        default_val = VariableManager.get_default_value(DataType(v_type))
         
         self.var_manager.create_variable(name, v_type, default_val)
         
@@ -181,7 +181,7 @@ class GlobalVariablePanel(UIPanelBase):
         # Jika tipe data tidak berubah, kita bisa ambil nilai lama
         old_type_str = str(DataType(old_var_data['type']).value) if not isinstance(old_var_data['type'], str) else old_var_data['type']
         if new_type != old_type_str:
-            new_val = VariableManager.DEFAULT_VALUES[DataType(new_type)]
+            new_val = VariableManager.get_default_value(DataType(new_type))
 
         # --- UPDATE MANAGER ---
         self.var_manager.edit_variable(

@@ -4,7 +4,7 @@ from Core.Enums.DataType import DataType
 
 class VariableManager(QObject):
     # Konstanta untuk konfigurasi variabel
-    DEFAULT_VALUES = {
+    _DEFAULT_VALUES = {
         DataType.STRING: "",
         DataType.INT: 0,
         DataType.FLOAT: 0.0,
@@ -19,7 +19,7 @@ class VariableManager(QObject):
     Atau gunakan seperti ini jika string: `DEFAULT_VALUES[DataType(DataType.INT.value)]` -> 0.
     '''
 
-    SUPPORTED_TYPES_AS_STRING = list(dt.value for dt in DEFAULT_VALUES.keys())
+    SUPPORTED_TYPES_AS_STRING = list(dt.value for dt in _DEFAULT_VALUES.keys())
 
     # Event signal untuk perubahan variabel
     variable_created = pyqtSignal(str)
@@ -75,10 +75,11 @@ class VariableManager(QObject):
             }
         }
     
-    def get_default_value(self, var_type):
+    @staticmethod
+    def get_default_value(var_type: str | DataType):
         """Mengembalikan nilai default berdasarkan tipe data"""
         dt = DataType(var_type)
-        result = VariableManager.DEFAULT_VALUES.get(dt, None)
+        result = VariableManager._DEFAULT_VALUES.get(dt, None)
         return result
     
     # === CRUD Methods ===
@@ -88,11 +89,13 @@ class VariableManager(QObject):
             del self.global_variables[name]
             self.variable_deleted.emit(name)
     
-    def edit_variable(self, old_name, new_name=None, new_type=None, new_value=None):
+    def edit_variable(self, old_name: str, new_name: str = None, new_type: DataType = None, new_value = None):
         if old_name not in self.global_variables:
             return
     
         var_data = self.global_variables.get(old_name)
+        if new_type is not None:
+            new_type = DataType(new_type).value
 
         # ===============================
         # 1. Tentukan nama final
@@ -106,30 +109,30 @@ class VariableManager(QObject):
         # ===============================
         # 2. Tentukan tipe final
         # ===============================
-        final_type = var_data["type"]
-        if new_type is not None or new_type != var_data["type"]:
+        final_type = DataType(var_data["type"]).value
+        old_type = final_type
+        type_changed = new_type is not None and new_type != old_type
+
+        if type_changed:
             final_type = new_type
 
         # ===============================
         # 3. Tentukan value final
         # ===============================
         final_value = var_data["value"]
+
         if new_value is not None:
-            if new_type is not None and new_type != var_data["type"]:
-                # Tipe berubah, set ke default baru
+            if type_changed:
                 final_value = self.get_default_value(final_type)
             else:
-                # Tipe sama, set ke value baru jika valid
                 if VariableManager.is_value_valid(final_type, {"value": new_value}):
                     final_value = new_value
-        else:
-            # Jika value tidak diberikan, dan tipe berubah
-            if new_type is not None and new_type != var_data["type"]:
-                final_value = self.get_default_value(final_type)
+        elif type_changed:
+            final_value = self.get_default_value(final_type)
         
         # Set data
         new_var = self.global_variables[final_name]
-        new_var["type"] = final_type
+        new_var["type"] = DataType(final_type)
         new_var["value"] = final_value
 
         # ===============================
@@ -142,8 +145,8 @@ class VariableManager(QObject):
             return  # Sudah ada
         
         self.global_variables[name] = {
-            'type': var_type,
-            'value': VariableManager.DEFAULT_VALUES[DataType(var_type)]
+            'type': DataType(var_type),
+            'value': VariableManager.get_default_value(var_type) if value is None else value
         }
 
         if value is not None:
@@ -152,54 +155,50 @@ class VariableManager(QObject):
         self.variable_created.emit(name)
     
     @staticmethod
-    def is_value_valid(dtype: DataType, meta: dict) -> bool:
+    def is_value_valid(dtype, meta: dict) -> bool:
         """
         Mengecek apakah value valid untuk DataType tertentu
         berdasarkan metadata variabel.
         """
 
-        value = None
-
         try:
+            # ===============================
+            # NORMALISASI TYPE
+            # ===============================
+            if isinstance(dtype, str):
+                dtype = DataType(dtype)
+
             value = meta.get("value")
 
             # ===============================
             # PRIMITIVE TYPES
             # ===============================
             if dtype == DataType.STRING:
-                value = str(value)
-                return isinstance(value, str)
+                return isinstance(str(value), str)
 
             if dtype == DataType.INT:
                 try:
-                    value = int(value)
+                    int(value)
+                    return True
                 except:
                     return False
-                return isinstance(value, int)
 
             if dtype == DataType.FLOAT:
                 try:
-                    value = float(value)
+                    float(value)
+                    return True
                 except:
                     return False
-                return isinstance(value, float)
 
             if dtype == DataType.BOOL:
-                try:
-                    value = bool(value)
-                except:
-                    return False
-                return isinstance(value, bool)
+                return isinstance(bool(value), bool)
 
             # ===============================
             # ENUM
             # ===============================
             if dtype == DataType.ENUM:
                 options = meta.get("options", [])
-                if not isinstance(options, list):
-                    return False
-                # enum tanpa options → dianggap empty / invalid
-                return value in options
+                return isinstance(options, list) and value in options
 
             # ===============================
             # LIST
@@ -210,12 +209,10 @@ class VariableManager(QObject):
 
                 list_type = meta.get("list_type")
                 if not list_type:
-                    # list tanpa list_type → list bebas
                     return True
 
-                # cek tiap item sesuai list_type
                 for item in value:
-                    if not VariableManager.is_value_valid(list_type, item, {}):
+                    if not VariableManager.is_value_valid(list_type, {"value": item}):
                         return False
                 return True
 
@@ -228,10 +225,8 @@ class VariableManager(QObject):
 
                 structure = meta.get("structure")
                 if not structure:
-                    # struct tanpa schema → any dict
                     return True
 
-                # validasi tiap field berdasarkan schema
                 for key, field_meta in structure.items():
                     if key not in value:
                         return False
@@ -239,9 +234,8 @@ class VariableManager(QObject):
                     field_type = field_meta.get("type")
                     field_value = value[key]
 
-                    if not VariableManager.is_value_valid(field_type, field_value, field_meta):
+                    if not VariableManager.is_value_valid(field_type, {"value": field_value}):
                         return False
-
                 return True
 
             # ===============================
@@ -252,20 +246,13 @@ class VariableManager(QObject):
                 if not class_name:
                     return False
 
-                # value bisa string reference atau object instance
                 if isinstance(value, str):
                     return True
 
-                # fallback: instance check (opsional)
-                try:
-                    return value.__class__.__name__ == class_name
-                except Exception:
-                    return False
-    
+                return value.__class__.__name__ == class_name
+
         except Exception:
             return False
 
-        # ===============================
-        # UNKNOWN TYPE
-        # ===============================
         return False
+
