@@ -37,9 +37,11 @@ class SocketItem(QGraphicsItem):
         # Gambar bentuk Polygon (Segitiga/Pentagon) jika EXEC, Lingkaran jika DATA
         if self.is_exec:
             path = QPainterPath()
-            path.moveTo(-5, -5)
-            path.lineTo(5, 0)
-            path.lineTo(-5, 5)
+            path.moveTo(-6, -6)
+            path.lineTo(0, -6)
+            path.lineTo(6, 0)
+            path.lineTo(0, 6)
+            path.lineTo(-6, 6)
             path.closeSubpath()
             painter.drawPath(path)
         else:

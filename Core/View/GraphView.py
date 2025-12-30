@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QPainter, QMouseEvent
 
 from Core.BaseNode import BaseNode
+from Core.Enums.DataType import DataType
 from Core.Graph.EdgeItem import EdgeItem
 from Core.Graph.SocketItem import SocketItem
 
@@ -19,8 +20,8 @@ class GraphView(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
 
         # Sembunyikan Scrollbar agar terlihat lebih clean (opsional)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         # Pengaturan Zoom
         self.zoom_factor = 1.15
@@ -289,7 +290,7 @@ class GraphView(QGraphicsView):
         else:
             # Buat sub-menu untuk setiap variabel yang tersedia
             for var_name in variables.keys():
-                action = set_var_menu.addAction(f"Set {var_name} ({variables[var_name]['type']})")
+                action = set_var_menu.addAction(f"Set {var_name} ({DataType(variables[var_name]['type']).value})")
                 # Kita simpan nama variabel di dalam data action agar bisa diambil nanti
                 action.setData(var_name)
         

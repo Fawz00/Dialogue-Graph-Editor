@@ -66,12 +66,12 @@ class MainWindow(QMainWindow):
         self.dock_vars.setObjectName("VariablesDock") # ID unik untuk save/restore state layout
         self.dock_vars.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         
-        self.var_panel = GlobalVariablePanel(self.var_manager)
+        self.var_panel = GlobalVariablePanel(self)
         self.dock_vars.setWidget(self.var_panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_vars)
 
         # --- Properties Dock (Right) ---
-        self.dock_props = QDockWidget("Details", self)
+        self.dock_props = QDockWidget("Inspector", self)
         self.dock_props.setObjectName("PropertiesDock")
         self.dock_props.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         
@@ -79,6 +79,9 @@ class MainWindow(QMainWindow):
         self.dock_props.setWidget(self.properties_panel)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
     
+        # --- Register event ---
+        self.var_panel.variable_selected.connect(self.properties_panel.load_variable)
+
     def setup_menu(self):
         menu_bar = self.menuBar()
         
@@ -191,6 +194,7 @@ class MainWindow(QMainWindow):
 
         # 2. REFRESH PANEL DETAILS
         # Jika node yang sedang diedit di panel details terpengaruh, refresh UI-nya
+        self.var_panel.refresh()
         self.properties_panel.refresh()
     
     def on_variable_deleted(self, name):
@@ -211,11 +215,13 @@ class MainWindow(QMainWindow):
                     item.update_sockets_by_variable("")
         
         # 2. REFRESH PANEL DETAILS
+        self.var_panel.refresh()
         self.properties_panel.refresh()
     
     def on_variable_created(self, name):
         """Dipanggil saat variabel dibuat"""
         # Hanya perlu refresh panel details
+        self.var_panel.refresh()
         self.properties_panel.refresh()
     
     def validate_node_connections(self, node):

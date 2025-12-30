@@ -82,7 +82,7 @@ class SetVarNode(BaseNode):
             self.is_valid = var_info is not None
 
             if var_info:
-                new_type = DataType(var_info['type'])
+                new_type = var_info['type'] if isinstance(var_info['type'], DataType) else DataType(var_info['type'])
 
                 # Perbarui nilai default berdasarkan tipe variabel
                 self.value_to_set = VariableManager.DEFAULT_VALUES[new_type]

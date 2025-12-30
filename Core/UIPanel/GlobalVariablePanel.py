@@ -5,22 +5,69 @@ from PyQt6.QtCore import Qt, pyqtSignal, QObject
 
 from Core.Enums.DataType import DataType
 from Core.Nodes.SetVarNode import SetVarNode
+from Core.UIPanelBase import UIPanelBase
 from Core.VariableManager import VariableManager
 from Core.UIPanel.Utils.TypeDelegate import TypeDelegate
 
-class GlobalVariablePanel(QWidget):
-    variable_changed = pyqtSignal(str, str)  # old_name, new_name
+class GlobalVariablePanel(UIPanelBase):
+    # Signal untuk mengirim data variabel yang dipilih ke MainWindow
+    variable_selected = pyqtSignal(str, dict)
     
-    def __init__(self, manager):
-        super().__init__()
-        self.manager = manager
-        self.layout = QVBoxLayout(self)
-        
+    def __init__(self, main_window):
+        super().__init__(main_window)
+        self.refresh()
+    
+    def clear(self):
+        # 1. Putuskan sinyal tree lama (kalau ada)
+        if hasattr(self, "tree") and self.tree:
+            try:
+                self.tree.itemClicked.disconnect()
+                self.tree.itemChanged.disconnect()
+                self.tree.customContextMenuRequested.disconnect()
+            except TypeError:
+                pass  # kalau belum terhubung, abaikan
+
+        # 2. Hapus semua item dari layout utama
+        while self.layout.count():
+            item = self.layout.takeAt(0)
+
+            widget = item.widget()
+            layout = item.layout()
+
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+            elif layout is not None:
+                self._clear_layout(layout)
+
+        # 3. Reset referensi penting
+        self.tree = None
+        self.name_edit = None
+        self.type_combo = None
+    
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+
+            widget = item.widget()
+            child_layout = item.layout()
+
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+            elif child_layout is not None:
+                self._clear_layout(child_layout)
+    
+    def refresh(self):
+        self.clear()
+
         # UI Create Section
         form = QHBoxLayout()
         self.name_edit = QLineEdit(placeholderText="Variable Name")
         self.type_combo = QComboBox()
-        self.type_combo.addItems(VariableManager.SUPPORTED_TYPES)
+        self.type_combo.addItems(VariableManager.SUPPORTED_TYPES_AS_STRING)
         btn_add = QPushButton("+ Add")
         btn_add.clicked.connect(self.add_variable)
         form.addWidget(self.name_edit); form.addWidget(self.type_combo); form.addWidget(btn_add)
@@ -28,11 +75,13 @@ class GlobalVariablePanel(QWidget):
         
         # Tree/Table Section
         self.tree = QTreeWidget()
-        self.tree.setColumnCount(3)
-        self.tree.setHeaderLabels(["Name", "Type", "Default Value"])
+        self.tree.setColumnCount(2)
+        self.tree.setHeaderLabels(["Name", "Type"])
         
         # PASANG DROPDOWN KE KOLOM TYPE (Index 1)
         self.tree.setItemDelegateForColumn(1, TypeDelegate(self))
+
+        self.tree.itemClicked.connect(self.on_item_clicked)
 
         # Aktifkan Context Menu
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -44,12 +93,25 @@ class GlobalVariablePanel(QWidget):
         self.tree.itemChanged.connect(self.on_item_changed)
         self.layout.addWidget(self.tree)
 
+        for var_name, var_data in self.var_manager.global_variables.items():
+            v_type = self.type_combo.currentText()
+            v_type = DataType(var_data.get("type")).value if var_data.get("type") else "Unknown"
+            item = QTreeWidgetItem([var_name, v_type])
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.tree.addTopLevelItem(item)
+    
+    def on_item_clicked(self, item, column):
+        var_name = item.text(0)
+        var_data = self.var_manager.global_variables.get(var_name)
+        if var_data:
+            self.variable_selected.emit(var_name, var_data)
+
     def add_variable(self):
         name = self.name_edit.text().strip()
         if not name: return
         
         # Validasi: Cek apakah nama sudah ada
-        if name in self.manager.global_variables:
+        if name in self.var_manager.global_variables:
             QMessageBox.warning(self, "Duplicate Name", f"Variable with name '{name}' already exists!")
             self.name_edit.setStyleSheet("background-color: #ffcccc;") # Feedback merah
             return
@@ -58,15 +120,15 @@ class GlobalVariablePanel(QWidget):
         v_type = self.type_combo.currentText()
         default_val = VariableManager.DEFAULT_VALUES[DataType(v_type)]
         
-        self.manager.global_variables[name] = {'type': v_type, 'value': default_val}
+        self.var_manager.create_variable(name, v_type, default_val)
         
-        item = QTreeWidgetItem([name, v_type, str(default_val)])
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        item = QTreeWidgetItem([name, v_type])
+        item.setFlags(item.flags() ^ Qt.ItemFlag.ItemIsEditable)
         self.tree.addTopLevelItem(item)
         self.name_edit.clear()
         
         # Emit signal created
-        self.manager.variable_created.emit(name)
+        self.var_manager.variable_created.emit(name)
     
     def delete_variable_item(self, item):
         """Fungsi helper untuk menghapus variabel secara bersih"""
@@ -80,10 +142,7 @@ class GlobalVariablePanel(QWidget):
         )
         
         if confirm == QMessageBox.StandardButton.Yes:
-            if var_name in self.manager.global_variables:
-                del self.manager.global_variables[var_name]
-                # Emit signal agar Graph & Details ikut update
-                self.manager.variable_deleted.emit(var_name)
+            self.var_manager.delete_variable(var_name)
             
             # Hapus dari visual pohon
             index = self.tree.indexOfTopLevelItem(item)
@@ -97,7 +156,7 @@ class GlobalVariablePanel(QWidget):
         row_idx = self.tree.indexOfTopLevelItem(item)
 
         # Ambil list keys untuk mencari nama lama berdasarkan urutan row
-        all_keys = list(self.manager.global_variables.keys())
+        all_keys = list(self.var_manager.global_variables.keys())
         if row_idx >= len(all_keys): 
             self.tree.blockSignals(False)
             return
@@ -105,49 +164,32 @@ class GlobalVariablePanel(QWidget):
         old_name = all_keys[row_idx]
         new_name = item.text(0).strip()
         new_type = item.text(1)
-        new_val_str = item.text(2)
 
         # --- VALIDASI RENAME ---
         if column == 0:
             if new_name == "":
                 item.setText(0, old_name) # Kembalikan jika kosong
                 new_name = old_name
-            elif new_name != old_name and new_name in self.manager.global_variables:
+            elif new_name != old_name and new_name in self.var_manager.global_variables:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 item.setText(0, old_name) # Reset ke nama lama di visual
                 new_name = old_name
             
-        # --- LOGIKA KONVERSI (Seperti sebelumnya) ---
-        # ... (Gunakan logika konversi DEFAULT_VALUES yang kita buat tadi) ...
-        # Misal:
-        converted_val = VariableManager.DEFAULT_VALUES[DataType(new_type)]
-        try:
-            if DataType(new_type) == DataType.INT: converted_val = int(float(new_val_str))
-            elif DataType(new_type) == DataType.FLOAT: converted_val = float(new_val_str)
-            elif DataType(new_type) == DataType.BOOL: converted_val = new_val_str in ("1", "True", "Yes", "true", "yes", "T", "Y", "t", "y")
-            elif DataType(new_type) == DataType.STRING: converted_val = new_val_str
-            # dst...
-        except:
-            pass
-        item.setText(2, str(converted_val))
+        old_var_data = self.var_manager.global_variables.get(old_name)
+        new_val = old_var_data['value']
+
+        # Jika tipe data tidak berubah, kita bisa ambil nilai lama
+        old_type_str = str(DataType(old_var_data['type']).value) if not isinstance(old_var_data['type'], str) else old_var_data['type']
+        if new_type != old_type_str:
+            new_val = VariableManager.DEFAULT_VALUES[DataType(new_type)]
 
         # --- UPDATE MANAGER ---
-        if old_name != new_name:
-            # Pindahkan data ke key baru
-            self.manager.global_variables[new_name] = self.manager.global_variables.pop(old_name)
-            self.manager.global_variables[new_name]['type'] = new_type
-            self.manager.global_variables[new_name]['value'] = converted_val
-
-            # Emit signal update
-            self.manager.variable_updated.emit(old_name, new_name)
-        else:
-            # Update tipe/value saja
-            self.manager.global_variables[old_name]['type'] = new_type
-            self.manager.global_variables[old_name]['value'] = converted_val
-
-            # Emit signal update dengan nama lama (karena tidak berubah)
-            self.manager.variable_updated.emit(old_name, old_name)
-
+        self.var_manager.edit_variable(
+            old_name,
+            new_name=new_name,
+            new_type=DataType(new_type),
+            new_value=new_val
+        )
         self.tree.blockSignals(False)
     
     def handle_key_press(self, event):

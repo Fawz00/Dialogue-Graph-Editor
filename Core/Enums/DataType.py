@@ -2,10 +2,10 @@ from enum import Enum
 
 class DataType(Enum):
     STRING = "string"
-    INT = "int"
+    INT = "integer"
     FLOAT = "float"
-    BOOL = "bool"
-    ENUM = "enum"
-    STRUCT = "struct"
+    BOOL = "boolean"
+    ENUM = "enummeration"
+    STRUCT = "structure"
     LIST = "list"
     CLASS = "class"
