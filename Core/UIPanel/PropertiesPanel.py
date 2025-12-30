@@ -58,17 +58,23 @@ class PropertiesPanel(UIPanelBase):
             if key == "Name":
                 new_name = value
                 self.target_data["name"] = new_name
+                self.var_manager.edit_variable(
+                    var_name,
+                    new_name=new_name
+                )
             elif key == "Type":
                 new_type = DataType(value)
+                self.var_manager.edit_variable(
+                    var_name,
+                    new_type=new_type
+                )
             elif key == "Default Value":
                 new_value = value
-            
-            self.var_manager.edit_variable(
-                var_name,
-                new_name=new_name,
-                new_type=new_type,
-                new_value=new_value
-            )
+                self.var_manager.edit_variable(
+                    var_name,
+                    new_value=new_value
+                )
+
             self.refresh()
     
     def refresh(self):

@@ -75,13 +75,11 @@ class VariableManager(QObject):
             }
         }
     
-    def get_default_value(self, var_type, type_name=None):
+    def get_default_value(self, var_type):
         """Mengembalikan nilai default berdasarkan tipe data"""
         dt = DataType(var_type)
-        if dt == DataType.LIST and type_name:
-            # Jika list dengan tipe tertentu, kembalikan list kosong
-            return []
-        return VariableManager.DEFAULT_VALUES.get(dt, None)
+        result = VariableManager.DEFAULT_VALUES.get(dt, None)
+        return result
     
     # === CRUD Methods ===
     
@@ -93,8 +91,8 @@ class VariableManager(QObject):
     def edit_variable(self, old_name, new_name=None, new_type=None, new_value=None):
         if old_name not in self.global_variables:
             return
-
-        var_data = self.global_variables[old_name]
+    
+        var_data = self.global_variables.get(old_name)
 
         # ===============================
         # 1. Tentukan nama final
@@ -109,34 +107,31 @@ class VariableManager(QObject):
         # 2. Tentukan tipe final
         # ===============================
         final_type = var_data["type"]
-        if new_type and new_type != var_data["type"]:
+        if new_type is not None or new_type != var_data["type"]:
             final_type = new_type
-            var_data["type"] = final_type
 
         # ===============================
         # 3. Tentukan value final
         # ===============================
+        final_value = var_data["value"]
         if new_value is not None:
-            val_str = str(new_value)
-            try:
-                dt = DataType(final_type)
-                if dt == DataType.INT:
-                    var_data["value"] = int(float(val_str))
-                elif dt == DataType.FLOAT:
-                    var_data["value"] = float(val_str)
-                elif dt == DataType.BOOL:
-                    var_data["value"] = val_str.lower() in ("1", "true", "yes", "t", "y")
-                elif dt == DataType.STRING:
-                    var_data["value"] = val_str
-                else:
-                    var_data["value"] = new_value
-            except Exception:
-                pass  # gagal konversi → value lama dipertahankan
+            if new_type is not None and new_type != var_data["type"]:
+                # Tipe berubah, set ke default baru
+                final_value = self.get_default_value(final_type)
+            else:
+                # Tipe sama, set ke value baru jika valid
+                if VariableManager.is_value_valid(final_type, {"value": new_value}):
+                    final_value = new_value
         else:
-            # Jika tipe berubah tapi value tidak diberikan → reset default
-            if final_type != var_data["type"]:
-                var_data["value"] = VariableManager.DEFAULT_VALUES[DataType(final_type)]
+            # Jika value tidak diberikan, dan tipe berubah
+            if new_type is not None and new_type != var_data["type"]:
+                final_value = self.get_default_value(final_type)
         
+        # Set data
+        new_var = self.global_variables[final_name]
+        new_var["type"] = final_type
+        new_var["value"] = final_value
+
         # ===============================
         # 4. Emit update
         # ===============================
@@ -155,3 +150,122 @@ class VariableManager(QObject):
             self.global_variables[name]['value'] = value
 
         self.variable_created.emit(name)
+    
+    @staticmethod
+    def is_value_valid(dtype: DataType, meta: dict) -> bool:
+        """
+        Mengecek apakah value valid untuk DataType tertentu
+        berdasarkan metadata variabel.
+        """
+
+        value = None
+
+        try:
+            value = meta.get("value")
+
+            # ===============================
+            # PRIMITIVE TYPES
+            # ===============================
+            if dtype == DataType.STRING:
+                value = str(value)
+                return isinstance(value, str)
+
+            if dtype == DataType.INT:
+                try:
+                    value = int(value)
+                except:
+                    return False
+                return isinstance(value, int)
+
+            if dtype == DataType.FLOAT:
+                try:
+                    value = float(value)
+                except:
+                    return False
+                return isinstance(value, float)
+
+            if dtype == DataType.BOOL:
+                try:
+                    value = bool(value)
+                except:
+                    return False
+                return isinstance(value, bool)
+
+            # ===============================
+            # ENUM
+            # ===============================
+            if dtype == DataType.ENUM:
+                options = meta.get("options", [])
+                if not isinstance(options, list):
+                    return False
+                # enum tanpa options → dianggap empty / invalid
+                return value in options
+
+            # ===============================
+            # LIST
+            # ===============================
+            if dtype == DataType.LIST:
+                if not isinstance(value, list):
+                    return False
+
+                list_type = meta.get("list_type")
+                if not list_type:
+                    # list tanpa list_type → list bebas
+                    return True
+
+                # cek tiap item sesuai list_type
+                for item in value:
+                    if not VariableManager.is_value_valid(list_type, item, {}):
+                        return False
+                return True
+
+            # ===============================
+            # STRUCT
+            # ===============================
+            if dtype == DataType.STRUCT:
+                if not isinstance(value, dict):
+                    return False
+
+                structure = meta.get("structure")
+                if not structure:
+                    # struct tanpa schema → any dict
+                    return True
+
+                # validasi tiap field berdasarkan schema
+                for key, field_meta in structure.items():
+                    if key not in value:
+                        return False
+
+                    field_type = field_meta.get("type")
+                    field_value = value[key]
+
+                    if not VariableManager.is_value_valid(field_type, field_value, field_meta):
+                        return False
+
+                return True
+
+            # ===============================
+            # CLASS
+            # ===============================
+            if dtype == DataType.CLASS:
+                class_name = meta.get("class_name")
+                if not class_name:
+                    return False
+
+                # value bisa string reference atau object instance
+                if isinstance(value, str):
+                    return True
+
+                # fallback: instance check (opsional)
+                try:
+                    return value.__class__.__name__ == class_name
+                except Exception:
+                    return False
+    
+        except Exception:
+            return False
+
+        # ===============================
+        # UNKNOWN TYPE
+        # ===============================
+        return False
