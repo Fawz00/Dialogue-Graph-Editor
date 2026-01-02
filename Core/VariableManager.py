@@ -89,10 +89,10 @@ class VariableManager(QObject):
             del self.global_variables[name]
             self.variable_deleted.emit(name)
     
-    def edit_variable(self, old_name: str, new_name: str = None, new_type: DataType = None, new_value = None):
+    def edit_variable(self, old_name: str, new_name: str = None, new_type: DataType = None, new_value = None, value_path: list = None):
         if old_name not in self.global_variables:
             return
-    
+            
         var_data = self.global_variables.get(old_name)
         if new_type is not None:
             new_type = DataType(new_type).value
@@ -129,7 +129,7 @@ class VariableManager(QObject):
                     final_value = new_value
         elif type_changed:
             final_value = self.get_default_value(final_type)
-        
+                        
         # Set data
         new_var = self.global_variables[final_name]
         new_var["type"] = DataType(final_type)

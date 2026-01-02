@@ -43,10 +43,11 @@ class PropertiesPanel(UIPanelBase):
         self.target_data = {"type": "node", "obj": node}
         self.refresh()
 
-    def update_prop(self, key, value):
+    def update_prop(self, path: list, value):
         if self.target_data["type"] == "node":
-            self.target_data["obj"].set_property(key, value)
+            self.target_data["obj"].set_property(path, value)
             self.refresh()
+
         elif self.target_data["type"] == "global_var":
             old_name = self.target_data["name"]
             old_data = self.var_manager.global_variables.get(old_name)
@@ -55,11 +56,11 @@ class PropertiesPanel(UIPanelBase):
             new_type = DataType(old_data["type"]).value
             new_value = old_data["value"]
 
-            if key == "Name":
+            if path[0] == "Name":
                 new_name = value
-            elif key == "Type":
+            elif path[0] == "Type":
                 new_type = value
-            elif key == "Default Value":
+            elif path[0] == "Default Value":
                 new_value = value
             
             # Validasi
@@ -69,9 +70,9 @@ class PropertiesPanel(UIPanelBase):
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 new_name = old_name
             
-            old_type_str = str(DataType(old_data['type']).value) if not isinstance(old_data['type'], str) else old_data['type']
-            if new_type != old_type_str:
-                new_value = VariableManager.get_default_value(DataType(new_type))
+            # old_type_str = str(DataType(old_data['type']).value) if not isinstance(old_data['type'], str) else old_data['type']
+            # if new_type != old_type_str:
+            #     new_value = VariableManager.get_default_value(DataType(new_type))
 
             self.var_manager.edit_variable(
                 old_name,
@@ -130,7 +131,8 @@ class PropertiesPanel(UIPanelBase):
                 layout,
                 name,
                 conf,
-                lambda v, k=name: self.update_prop(k, v)
+                lambda v, k=[name]: self.update_prop(v, k),
+                [name]
             )
             if t == DataType.STRUCT and widget:
                 self.layout.addWidget(widget)  # Sudah return GroupBox langsung

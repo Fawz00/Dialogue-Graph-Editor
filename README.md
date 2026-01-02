@@ -28,21 +28,36 @@ python Main.py
 ```
 .
 ├── Core/
-│   ├── BaseNode.py
-│   ├── VariableManager.py
+│   ├── Enums/
+│   │   └── DataType.py
 │   ├── Graph/
-│   │   ├── SocketItem.py
-│   │   └── EdgeItem.py
+│   │   ├── EdgeItem.py
+│   │   └── SocketItem.py
 │   ├── Nodes/
-│   │   ├── StartNode.py
 │   │   ├── DialogueNode.py
-│   │   └── SetVarNode.py
-│   └── View/
-│       ├── GraphScene.py
-│       └── GraphView.py
-├── Style.py
+│   │   ├── RerouteNode.py
+│   │   ├── SetVarNode.py
+│   │   └── StartNode.py
+│   ├── Structures/
+│   │   └── Property.py
+│   ├── UIPanel/
+│   │   ├── Utils/
+│   │   │   ├── PropertyWidgetFactory.py
+│   │   │   └── TypeDelegate.py
+│   │   ├── GlobalVariablePanel.py
+│   │   └── PropertiesPanel.py
+│   ├── View/
+│   │   ├── GraphScene.py
+│   │   └── GraphView.py
+│   ├── BaseNode.py
+│   ├── UIPanelBase.py
+│   └── VariableManager.py
+├── .gitignore
+├── Cleanup.py
 ├── Main.py
-└── requirements.txt
+├── README.md
+├── requirements.txt
+└── Style.py
 ```
 
 ## Usage

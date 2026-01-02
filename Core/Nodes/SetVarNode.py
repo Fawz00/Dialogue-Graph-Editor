@@ -85,7 +85,7 @@ class SetVarNode(BaseNode):
                 new_type = var_info['type'] if isinstance(var_info['type'], DataType) else DataType(var_info['type'])
 
                 # Perbarui nilai default berdasarkan tipe variabel
-                self.value_to_set = VariableManager.DEFAULT_VALUES[new_type]
+                self.value_to_set = VariableManager.get_default_value(new_type)
             
             self.update_sockets_by_variable(value) # Perbarui socket data
         
