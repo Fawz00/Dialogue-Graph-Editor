@@ -2,6 +2,7 @@ import sys
 from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QFormLayout, QVBoxLayout,
                              QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox, QMessageBox)
 
+from Core.Nodes.SetVarNode import SetVarNode
 from Core.UIPanelBase import UIPanelBase
 from Core.Enums.DataType import DataType
 from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
@@ -45,7 +46,9 @@ class PropertiesPanel(UIPanelBase):
 
     def update_prop(self, path: list, value):
         if self.target_data["type"] == "node":
-            self.target_data["obj"].set_property(path, value)
+            node = self.target_data["obj"]
+            node.set_property(path, value)
+
             self.refresh()
 
         elif self.target_data["type"] == "global_var":
@@ -70,12 +73,11 @@ class PropertiesPanel(UIPanelBase):
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 new_name = old_name
             
-            # old_type_str = str(DataType(old_data['type']).value) if not isinstance(old_data['type'], str) else old_data['type']
-            # if new_type != old_type_str:
-            #     new_value = VariableManager.get_default_value(DataType(new_type))
+            # Update variable
+            full_path = [old_name] + path[1:]
 
             self.var_manager.edit_variable(
-                old_name,
+                value_path=full_path,
                 new_name=new_name,
                 new_type=DataType(new_type),
                 new_value=new_value

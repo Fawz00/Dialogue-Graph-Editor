@@ -34,3 +34,9 @@ DATA_TYPE_COLORS = {
     DataType.LIST: QColor(255, 165, 0),      # Oranye
     DataType.STRUCT: QColor(200, 0, 255),    # Ungu
 }
+
+LOG_LEVEL_COLORS = {
+    'info': QColor(200, 200, 200),      # Abu-abu
+    'warning': QColor(255, 200, 100),   # Kuning
+    'error': QColor(255, 100, 100),     # Merah
+}

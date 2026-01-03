@@ -18,7 +18,7 @@ class SocketItem(QGraphicsItem):
         self.label = label
         self.collision_radius = 8
         self.radius = 6
-        self.edges = []
+        self.edges: list[EdgeItem] = []
         self.setAcceptHoverEvents(True)
         
         # Posisi relatif terhadap node akan diatur oleh node itu sendiri
@@ -159,3 +159,19 @@ class SocketItem(QGraphicsItem):
         # Hapus socket dari scene jika masih ada
         if self.scene() is not None:
             self.scene().removeItem(self)
+    
+    def serialize(self):
+        return {
+            "id": id(self),
+            "is_input": self.is_input,
+            "is_exec": self.is_exec,
+            "data_type": self.data_type,
+            "label": self.label,
+            "connections": [
+                {
+                    "other_node_id": edge.end_socket.parent_node.id if edge.start_socket == self else edge.start_socket.parent_node.id,
+                    "other_socket_index": edge.end_socket.index if edge.start_socket == self else edge.start_socket.index
+                }
+                for edge in self.edges
+            ]
+        }

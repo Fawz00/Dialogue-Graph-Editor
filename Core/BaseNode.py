@@ -13,8 +13,11 @@ class BaseNode(QGraphicsItem):
         self.title = title
         self.is_removable = True
         self.is_valid = True
+        self.properties = {}
         self.width = 150
         self.height = 80
+
+        # Sockets
         self.inputs = []
         self.outputs = []
         
@@ -136,19 +139,24 @@ class BaseNode(QGraphicsItem):
         """Override ini untuk memperbarui tampilan atau data internal node"""
         pass
 
-    def get_properties(self):
+    def get_properties(self) -> dict:
         """Override ini untuk menampilkan properti di panel samping"""
         return {}
 
-    def set_property(self, key, value):
+    def set_property(self, key_path: list, value):
         """Override ini untuk menerima update dari panel samping"""
         pass
-    
+
     def serialize(self):
         """Mengubah node menjadi dict untuk disimpan"""
         return {
+            "id": id(self),
             "title": self.title,
             "pos": (self.pos().x(), self.pos().y()),
-            "type": self.__class__.__name__,
-            # Tambahkan properti lain sesuai kebutuhan
+            "node_type": self.__class__.__name__,
+            "properties": self.properties,
+            "sockets": {
+                "inputs": [sock.serialize() for sock in self.inputs],
+                "outputs": [sock.serialize() for sock in self.outputs]
+            }
         }

@@ -13,6 +13,17 @@ class DialogueNode(BaseNode):
         self.add_socket(True, True) # Input flow
         self.refresh_outputs()
 
+        self.properties = {
+            "NPC Text": {
+                "type": DataType.STRING,
+                "value": self.npc_text
+            },
+            "Choices": {
+                "type": DataType.STRING,
+                "value": ",".join(self.choices) # Simpel: comma separated
+            }
+        }
+
     def refresh_outputs(self):
         # Hapus socket output lama (secara logika sederhana)
         # Di aplikasi real, perlu cleanup edge yang terhubung
@@ -25,14 +36,11 @@ class DialogueNode(BaseNode):
             self.add_socket(False, True, label=choice)
 
     def get_properties(self):
-        return {
-            "NPC Text": {"type": DataType.STRING, "value": self.npc_text},
-            "Choices": {"type": DataType.STRING, "value": ",".join(self.choices)} # Simpel: comma separated
-        }
+        return self.properties
 
-    def set_property(self, key, value):
-        if key == "NPC Text":
+    def set_property(self, key_path: list, value):
+        if key_path[0] == "NPC Text":
             self.npc_text = value
-        elif key == "Choices":
+        elif key_path[0] == "Choices":
             self.choices = [x.strip() for x in value.split(",") if x.strip()]
             self.refresh_outputs()

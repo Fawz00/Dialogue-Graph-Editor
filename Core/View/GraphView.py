@@ -202,7 +202,7 @@ class GraphView(QGraphicsView):
                 var_name = selected_action.data()
                 node = SetVarNode(self.main_window.var_manager)
                 self.spawn_node(node, pos)
-                node.set_property("Variable", var_name) # Otomatis set variabelnya
+                node.set_property(["Variable"], var_name) # Otomatis set variabelnya
             elif selected_action == act_reroute:
                 reroute = RerouteNode()
                 self.spawn_node(reroute, pos)
@@ -229,10 +229,8 @@ class GraphView(QGraphicsView):
         elif selected_action and selected_action.parent() == set_var_menu:
             var_name = selected_action.data()
             new_node = SetVarNode(self.main_window.var_manager)
-            new_node.set_property("Variable", var_name)
+            new_node.set_property(["Variable"], var_name)
         elif selected_action == act_reroute:
-            new_node = RerouteNode()
-
             start_sock = self.scene().start_socket
             new_node = RerouteNode(start_sock.is_exec, start_sock.data_type) if hasattr(start_sock.parent_node, 'is_reroute') else RerouteNode()
             self.spawn_node(new_node, scene_pos)

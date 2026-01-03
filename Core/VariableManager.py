@@ -1,5 +1,6 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from Core.Debug import Debug
 from Core.Enums.DataType import DataType
 
 class VariableManager(QObject):
@@ -89,56 +90,76 @@ class VariableManager(QObject):
             del self.global_variables[name]
             self.variable_deleted.emit(name)
     
-    def edit_variable(self, old_name: str, new_name: str = None, new_type: DataType = None, new_value = None, value_path: list = None):
-        if old_name not in self.global_variables:
+    def edit_variable(self, value_path: list, new_name: str = None, new_type: DataType = None, new_value=None):
+        if not value_path:
             return
-            
-        var_data = self.global_variables.get(old_name)
-        if new_type is not None:
-            new_type = DataType(new_type).value
 
         # ===============================
-        # 1. Tentukan nama final
+        # Fungsi rekursif untuk navigasi & update
         # ===============================
-        final_name = old_name
-        if new_name and new_name.strip() and new_name != old_name:
-            final_name = new_name.strip()
-            self.global_variables[final_name] = var_data
-            del self.global_variables[old_name]
+        def recursive_update(parent, path):
+            key = path[0]
+            is_last = len(path) == 1
 
-        # ===============================
-        # 2. Tentukan tipe final
-        # ===============================
-        final_type = DataType(var_data["type"]).value
-        old_type = final_type
-        type_changed = new_type is not None and new_type != old_type
-
-        if type_changed:
-            final_type = new_type
-
-        # ===============================
-        # 3. Tentukan value final
-        # ===============================
-        final_value = var_data["value"]
-
-        if new_value is not None:
-            if type_changed:
-                final_value = self.get_default_value(final_type)
+            # Tentukan current target
+            if isinstance(parent, dict):
+                if key not in parent:
+                    return
+                current = parent[key]
+            elif isinstance(parent, list):
+                if not (isinstance(key, int) and 0 <= key < len(parent)):
+                    return
+                current = parent[key]
             else:
-                if VariableManager.is_value_valid(final_type, {"value": new_value}):
-                    final_value = new_value
-        elif type_changed:
-            final_value = self.get_default_value(final_type)
-                        
-        # Set data
-        new_var = self.global_variables[final_name]
-        new_var["type"] = DataType(final_type)
-        new_var["value"] = final_value
+                return
 
-        # ===============================
-        # 4. Emit update
-        # ===============================
-        self.variable_updated.emit(old_name, final_name)
+            if is_last:
+                # ===============================
+                # Level target: update name, type, value
+                # ===============================
+                # 1. Rename (hanya berlaku untuk dict key, bukan list item)
+                if new_name and isinstance(parent, dict) and new_name != key:
+                    parent[new_name] = current
+                    del parent[key]
+                    key = new_name
+                    current = parent[key]
+
+                # 2. Update type
+                if new_type is not None:
+                    new_type_value = DataType(new_type).value
+                    old_type_value = DataType(current["type"]).value
+                    if new_type_value != old_type_value:
+                        current["type"] = DataType(new_type_value)
+                        current["value"] = self.get_default_value(new_type_value)
+
+                # 3. Update value
+                if new_value is not None:
+                    final_type_value = DataType(current["type"]).value
+                    if VariableManager.is_value_valid(final_type_value, {"value": new_value}):
+                        current["value"] = new_value
+
+                return current
+
+            # ===============================
+            # Rekursi ke level berikutnya
+            # ===============================
+            next_parent = None
+            if isinstance(current, dict) and "value" in current:
+                next_parent = current["value"]
+            elif isinstance(current, list) and all(isinstance(i, dict) and "type" in i for i in current):
+                next_parent = current  # list of structs
+            else:
+                return
+
+            recursive_update(next_parent, path[1:])
+
+        # Mulai dari top-level global_variables
+        recursive_update(self.global_variables, value_path)
+
+        # Emit update untuk path top-level
+        top_name = value_path[0]
+        final_name = new_name if new_name and len(value_path) == 1 else top_name
+        self.variable_updated.emit(top_name, final_name)
     
     def create_variable(self, name, var_type, value=None):
         if name in self.global_variables:
