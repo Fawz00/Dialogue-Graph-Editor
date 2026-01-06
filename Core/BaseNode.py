@@ -109,6 +109,31 @@ class BaseNode(QGraphicsItem):
         socket.destroy()
         
         self.update_socket_positions()
+    
+    def clear_sockets(self):
+        """Menghapus semua socket dari node"""
+        for sock in self.inputs + self.outputs:
+            sock.destroy()
+        
+        self.inputs = []
+        self.outputs = []
+        self.update_socket_positions()
+    
+    def validate_socket_connections(self):
+        """Memutus kabel jika tipe data socket berubah dan tidak cocok dengan kabelnya"""
+        for socket in self.inputs + self.outputs:
+            socket = cast(SocketItem, socket)
+            if socket.is_exec:
+                continue # Lewati alur eksekusi
+            
+            for edge in socket.edges[:]:
+                # Ambil socket lawan
+                other_socket = edge.start_socket if edge.end_socket == socket else edge.end_socket
+                other_socket = cast(SocketItem, other_socket)
+                
+                # Jika tipe data sudah tidak sama, putus koneksinya!
+                if socket.data_type != other_socket.data_type:
+                    self.remove_socket(socket)
 
     def update_socket_positions(self):
         # Hitung tinggi node berdasarkan jumlah socket
@@ -134,6 +159,13 @@ class BaseNode(QGraphicsItem):
                 for edge in sock.edges:
                     edge.update_path()
         return super().itemChange(change, value)
+    
+    def destroy(self):
+        # Hapus semua socket
+        self.clear_sockets()
+        # Hapus node dari scene
+        if self.scene() is not None:
+            self.scene().removeItem(self)
 
     def refresh(self):
         """Override ini untuk memperbarui tampilan atau data internal node"""

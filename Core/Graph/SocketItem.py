@@ -8,7 +8,7 @@ from Core.Graph.EdgeItem import EdgeItem
 from Style import STYLES, DATA_TYPE_COLORS
 
 class SocketItem(QGraphicsItem):
-    def __init__(self, parent_node, index, is_input=True, is_exec=True, data_type=None, label=""):
+    def __init__(self, parent_node, index, is_input=True, is_exec=True, data_type: DataType = None, label=""):
         super().__init__(parent_node)
         self.parent_node = parent_node
         self.index = index

@@ -1,14 +1,17 @@
-import sys
+import sys, select, threading 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView, 
                              QGraphicsItem, QGraphicsPathItem, QGraphicsProxyWidget,
-                             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
+                             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QLayout,
                              QPushButton, QComboBox, QDockWidget, QListWidget, QFormLayout,
-                             QMenu, QTreeWidget, QTreeWidgetItem, QMessageBox)
-from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence
+                             QMenu, QTreeWidget, QTreeWidgetItem, QMessageBox, QToolBar, QMenuBar, QStatusBar,
+                             QSizePolicy)
+from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
+from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence, QIcon
 
-from Style import STYLES
+from Core.Debug import Debug
+from Core.EventSystem.EventBus import EventBus
 
+from Core.UIPanel.LogPanel import LogPanel
 from Core.VariableManager import VariableManager
 from Core.BaseNode import BaseNode
 
@@ -25,19 +28,23 @@ from Core.View.GraphView import GraphView
 from Core.UIPanel.PropertiesPanel import PropertiesPanel
 from Core.UIPanel.GlobalVariablePanel import GlobalVariablePanel
 
-# ==========================================
-# 6. MAIN WINDOW
-# ==========================================
+from Style import STYLES
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Python Dialogue Graph Editor")
+        self.setWindowTitle(APP_NAME)
         self.resize(1000, 700)
         self.setStyleSheet("QMainWindow { background-color: #222; color: #EEE; }")
 
         # Data logic
         self.var_manager = VariableManager()
+
+        # Editor EventBus
+        self.event_bus = EventBus()
+
+        # Setup logger
+        Debug.set_main_window(self)
 
         # Connect signal untuk update node jika variabel diubah
         self.var_manager.variable_updated.connect(self.on_variable_updated)
@@ -52,7 +59,10 @@ class MainWindow(QMainWindow):
         # Panels
         self.setup_docks()
 
-        # 2. Setup Menu Bar
+        # Setup Toolbar
+        self.setup_toolbar()
+
+        # Setup Menu Bar
         self.setup_menu()
 
         # Tambahkan Start Node DI AKHIR inisialisasi
@@ -64,7 +74,7 @@ class MainWindow(QMainWindow):
         # --- Variables Dock (Left) ---
         self.dock_vars = QDockWidget("Global Variables", self)
         self.dock_vars.setObjectName("VariablesDock") # ID unik untuk save/restore state layout
-        self.dock_vars.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.dock_vars.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
         
         self.var_panel = GlobalVariablePanel(self)
         self.dock_vars.setWidget(self.var_panel)
@@ -73,20 +83,65 @@ class MainWindow(QMainWindow):
         # --- Properties Dock (Right) ---
         self.dock_props = QDockWidget("Inspector", self)
         self.dock_props.setObjectName("PropertiesDock")
-        self.dock_props.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.dock_props.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
         
         self.properties_panel = PropertiesPanel(self)
         self.dock_props.setWidget(self.properties_panel)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
+
+        # --- Log Dock (Bottom) ---
+        self.log_dock = QDockWidget("Log", self)
+        self.log_dock.setObjectName("LogDock")
+        
+        self.log_panel = LogPanel(self)
+        self.log_dock.setWidget(self.log_panel)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
     
         # --- Register event ---
-        self.var_panel.variable_selected.connect(self.properties_panel.load_variable)
+        self.var_panel.variable_selected.connect(self.properties_panel.load_variable)        
+    
+    def setup_toolbar(self):
+        toolbar = QToolBar("Execution Control")
+        toolbar.setIconSize(QSize(18, 18))
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+        toolbar.setMovable(False)
+
+        # Left Spacer
+        left_spacer = QWidget()
+        left_spacer.setSizePolicy(
+            QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        )
+        toolbar.addWidget(left_spacer)
+
+        # Action Run
+        self.run_act = QAction(QIcon("resources/run.png"), "Run", self)
+        self.run_act.triggered.connect(self.on_run_pressed)
+        toolbar.addAction(self.run_act)
+
+        # Action Pause
+        self.pause_act = QAction(QIcon("resources/pause.png"), "Pause", self)
+        self.pause_act.setEnabled(False) # Mati sampai dijalankan
+        self.pause_act.triggered.connect(self.on_pause_pressed)
+        toolbar.addAction(self.pause_act)
+
+        # Action Stop
+        self.stop_act = QAction(QIcon("resources/stop.png"), "Stop", self)
+        self.stop_act.setEnabled(False)
+        self.stop_act.triggered.connect(self.on_stop_pressed)
+        toolbar.addAction(self.stop_act)
+
+        # Right Spacer
+        right_spacer = QWidget()
+        right_spacer.setSizePolicy(
+            QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        )
+        toolbar.addWidget(right_spacer)
 
     def setup_menu(self):
-        menu_bar = self.menuBar()
+        self.menu_bar = self.menuBar()
         
         # === FILE MENU ===
-        file_menu = menu_bar.addMenu("&File") # Tanda & membuat shortcut Alt+F
+        file_menu = self.menu_bar.addMenu("&File") # Tanda & membuat shortcut Alt+F
         
         # Actions (Placeholder)
         act_open = QAction("Open", self)
@@ -109,9 +164,29 @@ class MainWindow(QMainWindow):
         act_export = QAction("Export", self)
         act_export.triggered.connect(self.file_export)
         file_menu.addAction(act_export)
+
+        # === EDIT MENU ===
+        edit_menu = self.menu_bar.addMenu("&Edit")
+
+        # Actions (Placeholder)
+        act_undo = QAction("Undo", self)
+        act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        edit_menu.addAction(act_undo)
+
+        act_redo = QAction("Redo", self)
+        act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        edit_menu.addAction(act_redo)
+
+        edit_menu.addSeparator()
+
+        act_preferences = QAction("Preferences", self)
+        edit_menu.addAction(act_preferences)
+
+        act_project_settings = QAction("Project Settings", self)
+        edit_menu.addAction(act_project_settings)
         
         # === VIEW MENU ===
-        view_menu = menu_bar.addMenu("&View")
+        view_menu = self.menu_bar.addMenu("&View")
         
         # Reset Layout Action
         act_reset = QAction("Reset Layout", self)
@@ -128,13 +203,21 @@ class MainWindow(QMainWindow):
         # Jika dock tertutup, menu ini jadi unchecked. Jika diklik, dock terbuka kembali.
         window_menu.addAction(self.dock_vars.toggleViewAction())
         window_menu.addAction(self.dock_props.toggleViewAction())
+        window_menu.addAction(self.log_dock.toggleViewAction())
 
         # === HELP MENU ===
-        help_menu = menu_bar.addMenu("&Help")
+        help_menu = self.menu_bar.addMenu("&Help")
         
         act_about = QAction("About", self)
         act_about.triggered.connect(self.help_about)
         help_menu.addAction(act_about)
+
+        # === WINDOW MENU ===
+        app_menu = self.menu_bar.addMenu("&Application")
+        
+        act_quit = QAction("Quit", self)
+        act_quit.triggered.connect(self.quit_application)
+        app_menu.addAction(act_quit)
     
     def create_initial_nodes(self):
         self.start_node = StartNode()
@@ -143,23 +226,47 @@ class MainWindow(QMainWindow):
         
         # Fokuskan kamera ke arah start node
         self.view.centerOn(self.start_node)
-    
-    # --- ACTION HANDLERS ---
 
-    def view_reset_layout(self):
+
+
+    # ===== ACTION HANDLERS =====
+    #region Action Handlers
+
+    def view_reset_layout(self, menu: QMenuBar):
         # 1. Pastikan dock terlihat (mungkin user me-close nya)
         self.dock_vars.setVisible(True)
         self.dock_props.setVisible(True)
+        self.log_dock.setVisible(True)
         
         # 2. Kembalikan ke posisi awal (Floating false, area specific)
         self.dock_vars.setFloating(False)
         self.dock_props.setFloating(False)
+        self.log_dock.setFloating(False)
         
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_vars)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
         
         # Opsional: Reset ukuran window utama jika mau
         # self.resize(1000, 700)
+    
+    def on_run_pressed(self):
+        Debug.log("Execution started.")
+        self.run_act.setEnabled(False)
+        self.pause_act.setEnabled(True)
+        self.stop_act.setEnabled(True)
+        # Panggil fungsi interpreter di sini nantinya
+    
+    def on_pause_pressed(self):
+        Debug.log("Execution paused.")
+        self.run_act.setEnabled(True)
+        self.pause_act.setEnabled(False)
+        self.stop_act.setEnabled(True)
+    def on_stop_pressed(self):
+        Debug.log("Execution stopped.")
+        self.run_act.setEnabled(True)
+        self.pause_act.setEnabled(False)
+        self.stop_act.setEnabled(False)
 
     def file_open(self):
         print("Menu: Open clicked") # Placeholder
@@ -174,12 +281,28 @@ class MainWindow(QMainWindow):
         print("Menu: Export clicked") # Placeholder
         
     def help_about(self):
-        QMessageBox.about(self, "About Dialogue Editor", 
-                          "Python Dialogue Graph Editor v0.1\n\n"
+        QMessageBox.about(self, f"About Dialogue Editor", 
+                          f"Python Dialogue Graph Editor v{'.'.join(map(str, APP_VERSION))}\n\n"
                           "Inspired by Unreal Engine Blueprints.\n"
                           "Created with PyQt6.")
+    
+    def quit_application(self):
+        reply = QMessageBox.question(
+            self,
+            "Confirm Quit",
+            "Are you sure you want to quit?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            QApplication.quit()
 
-    # Handler ketika variabel global diubah
+    #endregion Action Handlers
+
+
+
+    # ===== Handler ketika variabel global diubah =====
+    #region Variable Change Handlers
+
     def on_variable_updated(self, old_name, new_name):
         """Dipanggil saat variabel diubah"""
         
@@ -190,7 +313,7 @@ class MainWindow(QMainWindow):
                     item.selected_var = new_name
                     item.set_property("Variable", new_name)
                     item.update_sockets_by_variable(new_name)
-                self.validate_node_connections(item)
+                item.validate_socket_connections()
 
         # 2. REFRESH PANEL DETAILS
         # Jika node yang sedang diedit di panel details terpengaruh, refresh UI-nya
@@ -203,13 +326,13 @@ class MainWindow(QMainWindow):
             if isinstance(item, SetVarNode):
                 if item.selected_var == name:
                     item.selected_var = ""
-                    item.set_property("Variable", "")
+                    item.set_property(["Variable"], "")
 
                     # Putus semua koneksi pada socket data sebelum dihapus
                     if item.in_data:
-                        self.view.clear_socket_connections(item.in_data)
+                        item.remove_socket(item.in_data)
                     if item.out_data:
-                        self.view.clear_socket_connections(item.out_data)
+                        item.remove_socket(item.out_data)
                     
                     # Bersihkan socket secara permanen
                     item.update_sockets_by_variable("")
@@ -224,22 +347,26 @@ class MainWindow(QMainWindow):
         self.var_panel.refresh()
         self.properties_panel.refresh()
     
-    def validate_node_connections(self, node):
-        """Memutus kabel jika tipe data socket berubah dan tidak cocok dengan kabelnya"""
-        for socket in node.inputs + node.outputs:
-            if socket.is_exec:
-                continue # Lewati alur eksekusi
-            
-            for edge in socket.edges[:]:
-                # Ambil socket lawan
-                other_socket = edge.start_socket if edge.end_socket == socket else edge.end_socket
+    #endregion Variable Change Handlers
 
-                # Jika tipe data sudah tidak sama, putus koneksinya!
-                if socket.data_type != other_socket.data_type:
-                    self.view.clear_socket_connections(socket)
+
+
+# ===== Entry Point =====
+
+APP_VERSION = [0, 0, 1]
+APP_NAME = "Dialogue Graph Editor"
 
 if __name__ == '__main__':
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseSoftwareOpenGL, True)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeMenuBar, True)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
+
     app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(".".join(map(str, APP_VERSION)))
+    app.setOrganizationName("FawwazHP")
+
     window = MainWindow()
+    # window.setGeometry(50, 50, 1020, 720)
     window.show()
     sys.exit(app.exec())

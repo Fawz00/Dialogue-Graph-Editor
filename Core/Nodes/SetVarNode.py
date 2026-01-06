@@ -81,18 +81,18 @@ class SetVarNode(BaseNode):
 
         if var_info:
             # Jika variabel valid, buat kembali socket datanya
-            v_type = var_info['type']
+            v_type = DataType(var_info['type'])
             self.title = f"Set {var_name}"
 
             if self.in_data is None:
-                self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type})")
+                self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})")
             else:
-                self.in_data = self.change_socket(self.in_data, is_exec=False, data_type=v_type)
+                self.in_data = self.change_socket(self.in_data, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})")
             
             if self.out_data is None:
-                self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type})")
+                self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})")
             else:
-                self.out_data = self.change_socket(self.out_data, is_exec=False, data_type=v_type)
+                self.out_data = self.change_socket(self.out_data, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})")
             
             self.is_valid = True
 

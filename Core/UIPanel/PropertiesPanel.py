@@ -59,11 +59,11 @@ class PropertiesPanel(UIPanelBase):
             new_type = DataType(old_data["type"]).value
             new_value = old_data["value"]
 
-            if path[0] == "Name":
+            if path[0] == "var_name":
                 new_name = value
-            elif path[0] == "Type":
+            elif path[0] == "var_type":
                 new_type = value
-            elif path[0] == "Default Value":
+            elif path[0] == "default_value":
                 new_value = value
             
             # Validasi
@@ -154,16 +154,19 @@ class PropertiesPanel(UIPanelBase):
 
         # Serialize structure
         variable_serializer = {
-            "Name": {
+            "var_name": {
+                "display_name": "Name",
                 "type": DataType.STRING,
                 "value": name
             },
-            "Type": {
+            "var_type": {
+                "display_name": "Type",
                 "type": DataType.ENUM,
                 "options": VariableManager.SUPPORTED_TYPES_AS_STRING,
                 "value": DataType(data['type']).value
             },
-            "Default Value": {
+            "default_value": {
+                "display_name": "Default Value",
                 "type": DataType(data['type']),
                 "options": data['options'] if 'options' in data else None,
                 "list_type": DataType(data['list_type']) if 'list_type' in data else None,

@@ -174,21 +174,12 @@ class GlobalVariablePanel(UIPanelBase):
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 item.setText(0, old_name) # Reset ke nama lama di visual
                 new_name = old_name
-            
-        old_var_data = self.var_manager.global_variables.get(old_name)
-        new_val = old_var_data['value']
-
-        # Jika tipe data tidak berubah, kita bisa ambil nilai lama
-        old_type_str = str(DataType(old_var_data['type']).value) if not isinstance(old_var_data['type'], str) else old_var_data['type']
-        if new_type != old_type_str:
-            new_val = VariableManager.get_default_value(DataType(new_type))
 
         # --- UPDATE MANAGER ---
         self.var_manager.edit_variable(
-            old_name,
+            value_path=[old_name],
             new_name=new_name,
             new_type=DataType(new_type),
-            new_value=new_val
         )
         self.tree.blockSignals(False)
     

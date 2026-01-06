@@ -1,7 +1,7 @@
 import sys
-from PyQt6.QtWidgets import (QGraphicsView, QMenu)
-from PyQt6.QtCore import Qt, QEvent
-from PyQt6.QtGui import QPainter, QMouseEvent
+from PyQt6.QtWidgets import (QGraphicsView, QMenu, QToolButton)
+from PyQt6.QtCore import Qt, QEvent, QSize
+from PyQt6.QtGui import QPainter, QMouseEvent, QIcon
 
 from Core.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
@@ -16,7 +16,10 @@ class GraphView(QGraphicsView):
     def __init__(self, scene, main_window):
         super().__init__(scene)
         self.main_window = main_window
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setRenderHints(
+            QPainter.RenderHint.Antialiasing
+            | QPainter.RenderHint.SmoothPixmapTransform
+        )
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
 
         # Sembunyikan Scrollbar agar terlihat lebih clean (opsional)
@@ -27,32 +30,48 @@ class GraphView(QGraphicsView):
         self.zoom_factor = 1.15
         self.zoom_level = 0
         self.zoom_range = [-10, 10] # Membatasi seberapa jauh bisa zoom in/out
-    
-    def delete_selected_nodes(self):
-        for item in self.scene().selectedItems():
-            if isinstance(item, BaseNode) and item.is_removable:
-                # Ambil semua socket
-                for sock in item.inputs + item.outputs:
-                    # Hapus semua garis yang terhubung ke socket tersebut
-                    for edge in sock.edges[:]:
-                        self.scene().removeItem(edge)
-                        # Jangan lupa hapus referensi edge di socket lawan agar tidak crash
-                        if edge.start_socket == sock and edge.end_socket:
-                            if edge in edge.end_socket.edges: edge.end_socket.edges.remove(edge)
-                        elif edge.end_socket == sock and edge.start_socket:
-                            if edge in edge.start_socket.edges: edge.start_socket.edges.remove(edge)
-                
-                self.scene().removeItem(item)
 
-                # Bersihkan panel properti jika node yang dihapus sedang ditampilkan
-                self.main_window.properties_panel.clear()
+        # Tombol Zoom In / Zoom Out
+        self.zoom_in_btn = QToolButton(self)
+        self.zoom_in_btn.setIcon(QIcon("resources/zoom_in.png"))
+        self.zoom_in_btn.setIconSize(QSize(32, 32))
+        self.zoom_in_btn.setToolTip("Zoom In")
+        self.zoom_in_btn.clicked.connect(self.zoom_in)
+
+        self.zoom_out_btn = QToolButton(self)
+        self.zoom_out_btn.setIcon(QIcon("resources/zoom_out.png"))
+        self.zoom_out_btn.setIconSize(QSize(32, 32))
+        self.zoom_out_btn.setToolTip("Zoom Out")
+        self.zoom_out_btn.clicked.connect(self.zoom_out)
+
+        # Optional: style biar kelihatan overlay
+        self.zoom_in_btn.setAutoRaise(True)
+        self.zoom_out_btn.setAutoRaise(True)
+
+        self._update_button_positions()
     
-    # --- Input Event ---
+    # ===== Floating Layout =====
+    #region Floating Layout
+    
+    def zoom_in(self):
+        if self.zoom_level < self.zoom_range[1]:
+            self.scale(self.zoom_factor, self.zoom_factor)
+            self.zoom_level += 1
+
+    def zoom_out(self):
+        if self.zoom_level > self.zoom_range[0]:
+            self.scale(1 / self.zoom_factor, 1 / self.zoom_factor)
+            self.zoom_level -= 1
+
+    #endregion Floating Layout
+    
+    # ===== Input Event =====
+    #region Input Events
     
     def keyPressEvent(self, event):
         # Deteksi tombol Delete atau Backspace
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Back):
-            self.delete_selected_nodes()
+            self._delete_selected_nodes()
         else:
             super().keyPressEvent(event)
         
@@ -85,7 +104,7 @@ class GraphView(QGraphicsView):
         
         # Jika double click pada kabel (EdgeItem)
         if isinstance(item, EdgeItem):
-            self.create_reroute_on_edge(item, self.mapToScene(event.pos()))
+            self._create_reroute_on_edge(item, self.mapToScene(event.pos()))
         else:
             super().mouseDoubleClickEvent(event)
 
@@ -108,7 +127,7 @@ class GraphView(QGraphicsView):
             
             # 1. Jika dilepas di atas socket (Koneksi Langsung)
             if isinstance(item, SocketItem):
-                if self.is_connection_allowed(out_sock, item):
+                if self._is_connection_allowed(out_sock, item):
                     if out_sock.is_input: item.connect_to(out_sock)
                     else: out_sock.connect_to(item)
                 
@@ -124,7 +143,7 @@ class GraphView(QGraphicsView):
                 pos_in_scene = self.mapToScene(event.pos())
                 
                 # PENTING: Menu dipanggil di sini, kabel masih terlihat
-                self.show_context_menu_at_drop(event.globalPosition().toPoint(), pos_in_scene)
+                self._show_context_menu_at_drop(event.globalPosition().toPoint(), pos_in_scene)
                 
                 # Setelah menu selesai (dipilih atau dicancel), baru hapus kabel sementara
                 if self.scene().temp_edge:
@@ -170,8 +189,15 @@ class GraphView(QGraphicsView):
                                  event.modifiers())
         super().mouseReleaseEvent(fake_event)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+
+    #endregion Input Events
     
-    # --- Other Event ---
+    # ===== Other Event =====
+    #region Other Events
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_button_positions()
 
     def contextMenuEvent(self, event):
         pos = self.mapToScene(event.pos())
@@ -189,11 +215,11 @@ class GraphView(QGraphicsView):
                 act_del.setEnabled(False)
             
             action = menu.exec(event.globalPos())
-            if action == act_del: self.delete_selected_nodes()
+            if action == act_del: self._delete_selected_nodes()
             
         else:
             # Menu tambah node
-            menu, act_dial, set_var_menu, act_reroute = self.get_context_menu(pos)
+            menu, act_dial, set_var_menu, act_reroute = self._get_context_menu(pos)
             selected_action = menu.exec(event.globalPos())
             
             if selected_action == act_dial:
@@ -214,11 +240,36 @@ class GraphView(QGraphicsView):
         else:
             self.main_window.properties_panel.clear()
     
-    # --- Helpers ---
+    #endregion Other Events
+        
+    # ===== Helpers =====
+    #region Helpers
+
+    def _update_button_positions(self):
+        margin = 10
+        btn_size = self.zoom_in_btn.sizeHint()
+
+        self.zoom_in_btn.move(
+            self.width() - btn_size.width() - margin,
+            margin
+        )
+
+        self.zoom_out_btn.move(
+            self.width() - btn_size.width() - margin,
+            margin + btn_size.height() + 5
+        )
+
+    def _delete_selected_nodes(self):
+        for item in self.scene().selectedItems():
+            if isinstance(item, BaseNode) and item.is_removable:
+                item.destroy()
+
+                # Bersihkan panel properti jika node yang dihapus sedang ditampilkan
+                self.main_window.properties_panel.clear()
     
-    def show_context_menu_at_drop(self, global_pos, scene_pos):
+    def _show_context_menu_at_drop(self, global_pos, scene_pos):
         """Dipanggil saat kabel dilepas di area kosong"""
-        menu, act_dial, set_var_menu, act_reroute = self.get_context_menu(scene_pos)
+        menu, act_dial, set_var_menu, act_reroute = self._get_context_menu(scene_pos)
         
         # Eksekusi menu secara synchronous
         selected_action = menu.exec(global_pos)
@@ -251,14 +302,14 @@ class GraphView(QGraphicsView):
             target_sockets = new_node.inputs if not start_sock.is_input else new_node.outputs
             
             for target_sock in target_sockets:
-                if self.is_connection_allowed(start_sock, target_sock):
+                if self._is_connection_allowed(start_sock, target_sock):
                     if start_sock.is_input:
                         target_sock.connect_to(start_sock)
                     else:
                         start_sock.connect_to(target_sock)
                     break
     
-    def is_connection_allowed(self, out_sock, in_sock):
+    def _is_connection_allowed(self, out_sock, in_sock):
         # Dasar: Harus beda (Input vs Output) dan Beda Node
         if out_sock.is_input == in_sock.is_input: return False
         if out_sock.parent_node == in_sock.parent_node: return False
@@ -271,7 +322,7 @@ class GraphView(QGraphicsView):
             
         return True
     
-    def get_context_menu(self, scene_pos):
+    def _get_context_menu(self, scene_pos):
         """Helper untuk membangun menu klik kanan yang dinamis"""
         menu = QMenu()
         
@@ -307,7 +358,7 @@ class GraphView(QGraphicsView):
         self.main_window.properties_panel.load_node(node)
         return node
 
-    def create_reroute_on_edge(self, edge, pos):
+    def _create_reroute_on_edge(self, edge, pos):
         """Menyisipkan reroute node di tengah kabel"""
         start_socket = edge.start_socket
         end_socket = edge.end_socket
@@ -327,3 +378,5 @@ class GraphView(QGraphicsView):
         # 3. Buat dua kabel baru (Sambungkan Start -> Reroute -> End)
         start_socket.connect_to(reroute.in_socket)
         reroute.out_socket.connect_to(end_socket)
+    
+    #endregion Helpers

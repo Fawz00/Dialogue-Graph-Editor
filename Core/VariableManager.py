@@ -15,10 +15,6 @@ class VariableManager(QObject):
         DataType.ENUM: [],
         DataType.CLASS: {}
     }
-    '''Berisi nilai default untuk tiap tipe data.\n
-    Gunakan DataType sebagai key, misal: `DEFAULT_VALUES[DataType.INT]` -> 0.\n
-    Atau gunakan seperti ini jika string: `DEFAULT_VALUES[DataType(DataType.INT.value)]` -> 0.
-    '''
 
     SUPPORTED_TYPES_AS_STRING = list(dt.value for dt in _DEFAULT_VALUES.keys())
 
@@ -29,30 +25,8 @@ class VariableManager(QObject):
 
     def __init__(self):
         super().__init__()
-        # Struktur: 
-        # {
-        #     "Variable": { <variable name>
-        #         "type": DataType.ENUM, <DataType>
-        #         "options": enum_values, <list>
-        #         "value": self.selected_var <string>
-        #     },
-        #     "Advanced Settings": { <variable name>
-        #         "type": DataType.STRUCT, <DataType>
-        #         "value": { <nested properties>
-        #             "Priority": {"type": DataType.INT, "value": 1},
-        #             "Interpolate": {"type": DataType.BOOL, "value": False},
-        #             "Test Float": {"type": DataType.FLOAT, "value": 0.0},
-        #             "Test List": {"type": DataType.LIST, "value": []},
-        #             "Text": {"type": DataType.STRING, "value": "None"},
-        #             "Example list":
-        #             {
-        #                 "type": DataType.LIST,
-        #                 "list_type": DataType.STRING,
-        #                 "value": ["Item1", "Item2"]
-        #             }
-        #         }
-        #     }
-        # }
+
+        # Inisialisasi dengan variabel placeholder
         self.global_variables = {
             "Variable": {
                 "type": DataType.ENUM,
@@ -93,7 +67,7 @@ class VariableManager(QObject):
     def edit_variable(self, value_path: list, new_name: str = None, new_type: DataType = None, new_value=None):
         if not value_path:
             return
-
+        
         # ===============================
         # Fungsi rekursif untuk navigasi & update
         # ===============================
@@ -174,6 +148,11 @@ class VariableManager(QObject):
             self.global_variables[name]['value'] = value
 
         self.variable_created.emit(name)
+    
+
+
+    # ===== Helper Methods =====
+    #region Helper Methods
     
     @staticmethod
     def is_value_valid(dtype, meta: dict) -> bool:
@@ -277,3 +256,4 @@ class VariableManager(QObject):
 
         return False
 
+    #endregion Helper Methods

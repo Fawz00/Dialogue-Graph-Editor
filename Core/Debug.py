@@ -3,6 +3,8 @@ import sys
 import datetime
 
 from Core.Enums.LogLevel import LogLevel
+from Core.EventSystem.Event import Event
+from Core.EventSystem.EventType import EventType
 
 class Debug:
     LEVELS = {
@@ -12,7 +14,12 @@ class Debug:
         'ENDC': '\033[0m',      # Reset
     }
 
+    _main_window = None
     log_data = []
+
+    @classmethod
+    def set_main_window(cls, main_window):
+        cls._main_window = main_window
 
     @staticmethod
     def _get_caller_info():
@@ -40,12 +47,23 @@ class Debug:
         endc = Debug.LEVELS['ENDC']
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         source = Debug._get_caller_info()
-        Debug.log_data.append({
+
+        data = {
             "timestamp": timestamp,
             "level": level.value,
             "message": message,
             "source": source
-        })
+        }
+
+        Debug.log_data.append(data)
+
+        if Debug._main_window:
+            Debug._main_window.event_bus.publish(Event(
+                type=EventType.EVENT_LOG_ADDED.value,
+                source=source,
+                payload=data
+            ))
+
         print(f"{color}[{timestamp}] [{level.value}] {message} ({source}){endc}", file=sys.stderr if level == LogLevel.ERROR else sys.stdout)
 
     @staticmethod

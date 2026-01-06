@@ -20,8 +20,10 @@ class PropertyWidgetFactory:
         data_type = DataType(config.get("type"))
         current_value = config.get("value")
 
+        display_name = config.get("display_name", var_name)
+
         if data_type not in (DataType.STRUCT, DataType.LIST):
-            layout.addWidget(QLabel(f"{var_name}:"))
+            layout.addWidget(QLabel(f"{display_name}:"))
 
         # ---------- STRING ----------
         if data_type == DataType.STRING:
@@ -86,7 +88,7 @@ class PropertyWidgetFactory:
 
         # ---------- LIST ----------
         elif data_type == DataType.LIST:
-            group = QGroupBox(var_name)
+            group = QGroupBox(display_name)
             group_layout = QVBoxLayout(group)
 
             list_type = config.get("list_type", DataType.STRING)
@@ -112,7 +114,7 @@ class PropertyWidgetFactory:
 
         # ---------- STRUCT ----------
         elif data_type == DataType.STRUCT:
-            group = QGroupBox(var_name)
+            group = QGroupBox(display_name)
             group_layout = QVBoxLayout(group)
 
             for sub_key, sub_config in current_value.items():
