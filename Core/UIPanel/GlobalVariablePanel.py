@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLi
                              QPushButton, QComboBox, QTreeWidget, QTreeWidgetItem, QMenu)
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 
+from Core.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.Nodes.SetVarNode import SetVarNode
 from Core.UIPanelBase import UIPanelBase
@@ -121,14 +122,6 @@ class GlobalVariablePanel(UIPanelBase):
         default_val = VariableManager.get_default_value(DataType(v_type))
         
         self.var_manager.create_variable(name, v_type, default_val)
-        
-        item = QTreeWidgetItem([name, v_type])
-        item.setFlags(item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-        self.tree.addTopLevelItem(item)
-        self.name_edit.clear()
-        
-        # Emit signal created
-        self.var_manager.variable_created.emit(name)
     
     def delete_variable_item(self, item):
         """Fungsi helper untuk menghapus variabel secara bersih"""
@@ -162,18 +155,20 @@ class GlobalVariablePanel(UIPanelBase):
             return
             
         old_name = all_keys[row_idx]
-        new_name = item.text(0).strip()
+        new_name = None
         new_type = item.text(1)
 
         # --- VALIDASI RENAME ---
         if column == 0:
             if new_name == "":
                 item.setText(0, old_name) # Kembalikan jika kosong
-                new_name = old_name
+                new_name = None
             elif new_name != old_name and new_name in self.var_manager.global_variables:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 item.setText(0, old_name) # Reset ke nama lama di visual
-                new_name = old_name
+                new_name = None
+            else:
+                new_name = item.text(0)
 
         # --- UPDATE MANAGER ---
         self.var_manager.edit_variable(

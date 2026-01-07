@@ -2,6 +2,8 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from Core.Debug import Debug
 from Core.Enums.DataType import DataType
+from Core.EventSystem.Event import Event
+from Core.EventSystem.EventType import EventType
 
 class VariableManager(QObject):
     # Konstanta untuk konfigurasi variabel
@@ -11,20 +13,17 @@ class VariableManager(QObject):
         DataType.FLOAT: 0.0,
         DataType.BOOL: False,
         DataType.STRUCT: {},
+        DataType.ARRAY: [],
         DataType.LIST: [],
         DataType.ENUM: [],
-        DataType.CLASS: {}
+        DataType.OBJECT: {}
     }
 
     SUPPORTED_TYPES_AS_STRING = list(dt.value for dt in _DEFAULT_VALUES.keys())
 
-    # Event signal untuk perubahan variabel
-    variable_created = pyqtSignal(str)
-    variable_updated = pyqtSignal(str, str)
-    variable_deleted = pyqtSignal(str)
-
-    def __init__(self):
-        super().__init__()
+    def __init__(self, main_window=None):
+        super().__init__(main_window)
+        self._main_window = main_window
 
         # Inisialisasi dengan variabel placeholder
         self.global_variables = {
@@ -40,11 +39,20 @@ class VariableManager(QObject):
                     "Interpolate": {"type": DataType.BOOL, "value": False},
                     "Test Float": {"type": DataType.FLOAT, "value": 0.0},
                     "Text": {"type": DataType.STRING, "value": "None"},
+                    "Example array":
+                    {
+                        "type": DataType.ARRAY,
+                        "element_type": DataType.STRING,
+                        "value": ["Item1", "Item2"]
+                    },
                     "Example list":
                     {
                         "type": DataType.LIST,
-                        "list_type": DataType.STRING,
-                        "value": ["Item1", "Item2"]
+                        "value": [
+                            {"type": DataType.INT, "value": 10},
+                            {"type": DataType.FLOAT, "value": 3.14},
+                            {"type": DataType.STRING, "value": "Hello"}
+                        ]
                     }
                 }
             }
@@ -62,78 +70,172 @@ class VariableManager(QObject):
     def delete_variable(self, name):
         if name in self.global_variables:
             del self.global_variables[name]
-            self.variable_deleted.emit(name)
+            self._main_window.event_bus.publish(Event(
+                type=EventType.EVENT_VARIABLE_REMOVED.value,
+                source="VariableManager",
+                payload={"name": name}
+            ))
     
     def edit_variable(self, value_path: list, new_name: str = None, new_type: DataType = None, new_value=None):
+        def get_nested_meta(current_meta, path):
+            parent = None
+            key = None
+            meta = current_meta
+
+            for segment in path[1:]:
+                parent = meta
+
+                if DataType(meta["type"]) == DataType.STRUCT:
+                    meta = meta["value"].get(segment)
+                    key = segment
+
+                elif DataType(meta["type"]) == DataType.ARRAY:
+                    try:
+                        idx = int(segment)
+                        meta = meta["value"][idx]
+                        key = idx
+                    except (ValueError, IndexError):
+                        Debug.log_error(f"Invalid list index '{segment}' while editing '{path}'.")
+                        return None, None, None
+                
+                elif DataType(meta["type"]) == DataType.LIST:
+                    try:
+                        idx = int(segment)
+                        meta = meta["value"][idx]
+                        key = idx
+                    except (ValueError, IndexError):
+                        Debug.log_error(f"Invalid list index '{segment}' while editing '{path}'.")
+                        return None, None, None
+
+                else:
+                    Debug.log_error(f"Cannot traverse into type {meta['type']} at '{segment}'.")
+                    return None, None, None
+
+                if meta is None:
+                    Debug.log_error(f"Path '{path}' does not exist.")
+                    return None, None, None
+
+            return parent, key, meta
+
+        # Edit variable berdasarkan path
         if not value_path:
+            Debug.log_error("Value path is empty in edit_variable.")
             return
-        
-        # ===============================
-        # Fungsi rekursif untuk navigasi & update
-        # ===============================
-        def recursive_update(parent, path):
-            key = path[0]
-            is_last = len(path) == 1
 
-            # Tentukan current target
+        old_var_name = value_path[0]
+
+        if old_var_name not in self.global_variables:
+            Debug.log_error(f"Variable '{old_var_name}' does not exist.")
+            return
+
+        root_meta = self.global_variables[old_var_name]
+
+        # Root variable
+        if len(value_path) == 1:
+            parent = self.global_variables
+            key = old_var_name
+            target_meta = root_meta
+        else:
+            parent, key, target_meta = get_nested_meta(root_meta, value_path)
+            if target_meta is None:
+                return
+
+        # =========================
+        # RENAME / REORDER
+        # =========================
+        if new_name is not None:
+
+            # STRUCT / root rename
             if isinstance(parent, dict):
-                if key not in parent:
+                if new_name in parent:
+                    Debug.log_error(f"Variable '{new_name}' already exists.")
                     return
-                current = parent[key]
+                parent[new_name] = parent.pop(key)
+                key = new_name
+
+            # LIST reorder
             elif isinstance(parent, list):
-                if not (isinstance(key, int) and 0 <= key < len(parent)):
+                try:
+                    new_index = int(new_name)
+                except ValueError:
+                    Debug.log_error("List reorder requires integer index.")
                     return
-                current = parent[key]
+
+                old_index = key
+                list_len = len(parent)
+
+                if not (0 <= new_index < list_len):
+                    Debug.log_error(f"Index {new_index} out of range for list reorder.")
+                    return
+
+                if new_index != old_index:
+                    item = parent.pop(old_index)
+                    parent.insert(new_index, item)
+                    key = new_index
+
             else:
+                Debug.log_error("Invalid parent type for rename/reorder.")
                 return
+        
+        # =========================
+        # CHANGE VALUE
+        # =========================
+        if new_value is not None:
+            if DataType(parent["type"]) == DataType.ARRAY:
+                old_value = target_meta
 
-            if is_last:
-                # ===============================
-                # Level target: update name, type, value
-                # ===============================
-                # 1. Rename (hanya berlaku untuk dict key, bukan list item)
-                if new_name and isinstance(parent, dict) and new_name != key:
-                    parent[new_name] = current
-                    del parent[key]
-                    key = new_name
-                    current = parent[key]
+                # Coba pasang dulu
+                parent["value"][key] = new_value
 
-                # 2. Update type
-                if new_type is not None:
-                    new_type_value = DataType(new_type).value
-                    old_type_value = DataType(current["type"]).value
-                    if new_type_value != old_type_value:
-                        current["type"] = DataType(new_type_value)
-                        current["value"] = self.get_default_value(new_type_value)
-
-                # 3. Update value
-                if new_value is not None:
-                    final_type_value = DataType(current["type"]).value
-                    if VariableManager.is_value_valid(final_type_value, {"value": new_value}):
-                        current["value"] = new_value
-
-                return current
-
-            # ===============================
-            # Rekursi ke level berikutnya
-            # ===============================
-            next_parent = None
-            if isinstance(current, dict) and "value" in current:
-                next_parent = current["value"]
-            elif isinstance(current, list) and all(isinstance(i, dict) and "type" in i for i in current):
-                next_parent = current  # list of structs
+                # Validasi
+                if not self.is_value_valid(parent["element_type"], {"value": new_value}):
+                    # Rollback jika invalid
+                    parent["value"][key] = old_value
+                    Debug.log_warning(f"Invalid array element value '{new_value}' for type {parent['element_type']}.")
             else:
-                return
+                old_value = target_meta.get("value")
 
-            recursive_update(next_parent, path[1:])
+                # Coba pasang dulu
+                target_meta["value"] = new_value
 
-        # Mulai dari top-level global_variables
-        recursive_update(self.global_variables, value_path)
+                # Validasi
+                if not self.is_value_valid(target_meta["type"], target_meta):
+                    # Rollback jika invalid
+                    target_meta["value"] = old_value
+                    Debug.log_warning(f"Invalid value '{new_value}' for type {target_meta['type']}.")
 
-        # Emit update untuk path top-level
-        top_name = value_path[0]
-        final_name = new_name if new_name and len(value_path) == 1 else top_name
-        self.variable_updated.emit(top_name, final_name)
+        # =========================
+        # CHANGE TYPE
+        # =========================
+        if new_type is not None:
+            target_meta["type"] = new_type
+
+            # Bersihkan metadata lama
+            target_meta.pop("options", None)
+            target_meta.pop("element_type", None)
+
+            # Inisialisasi metadata sesuai tipe
+            if new_type == DataType.ENUM:
+                target_meta["options"] = []
+            elif new_type == DataType.ARRAY:
+                target_meta["element_type"] = DataType.STRING
+            elif new_type == DataType.STRUCT:
+                pass  # STRUCT hanya butuh value dict
+
+            # Value selalu reset dari sumber kebenaran
+            target_meta["value"] = self.get_default_value(new_type)
+
+        # =========================
+        # EMIT EVENT
+        # =========================
+        self._main_window.event_bus.publish(Event(
+            type=EventType.EVENT_VARIABLE_UPDATED.value,
+            source="VariableManager",
+            payload={
+                "old_name": old_var_name,
+                "new_name": new_name or old_var_name
+            }
+        ))
     
     def create_variable(self, name, var_type, value=None):
         if name in self.global_variables:
@@ -147,7 +249,11 @@ class VariableManager(QObject):
         if value is not None:
             self.global_variables[name]['value'] = value
 
-        self.variable_created.emit(name)
+        self._main_window.event_bus.publish(Event(
+            type=EventType.EVENT_VARIABLE_ADDED.value,
+            source="VariableManager",
+            payload={"name": name}
+        ))
     
 
 
@@ -201,18 +307,30 @@ class VariableManager(QObject):
                 return isinstance(options, list) and value in options
 
             # ===============================
+            # ARRAY
+            # ===============================
+            if dtype == DataType.ARRAY:
+                if not isinstance(value, list):
+                    return False
+
+                element_type = meta.get("element_type")
+                if not element_type:
+                    return True
+
+                for item in value:
+                    if not VariableManager.is_value_valid(element_type, {"value": item}):
+                        return False
+                return True
+
+            # ===============================
             # LIST
             # ===============================
             if dtype == DataType.LIST:
                 if not isinstance(value, list):
                     return False
 
-                list_type = meta.get("list_type")
-                if not list_type:
-                    return True
-
                 for item in value:
-                    if not VariableManager.is_value_valid(list_type, {"value": item}):
+                    if not VariableManager.is_value_valid(element_type, item):
                         return False
                 return True
 
@@ -239,9 +357,9 @@ class VariableManager(QObject):
                 return True
 
             # ===============================
-            # CLASS
+            # OBJECT
             # ===============================
-            if dtype == DataType.CLASS:
+            if dtype == DataType.OBJECT:
                 class_name = meta.get("class_name")
                 if not class_name:
                     return False

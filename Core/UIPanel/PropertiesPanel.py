@@ -7,6 +7,7 @@ from Core.UIPanelBase import UIPanelBase
 from Core.Enums.DataType import DataType
 from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
 from Core.VariableManager import VariableManager
+from PyQt6.QtWidgets import QScrollArea
 
 class PropertiesPanel(UIPanelBase):
     def __init__(self, main_window):
@@ -55,23 +56,21 @@ class PropertiesPanel(UIPanelBase):
             old_name = self.target_data["name"]
             old_data = self.var_manager.global_variables.get(old_name)
             
-            new_name = old_name
-            new_type = DataType(old_data["type"]).value
-            new_value = old_data["value"]
+            new_name = None
+            new_type = None
+            new_value = None
 
             if path[0] == "var_name":
                 new_name = value
             elif path[0] == "var_type":
-                new_type = value
+                new_type = DataType(value)
             elif path[0] == "default_value":
                 new_value = value
             
             # Validasi
-            if new_name == "":
-                new_name = old_name
-            elif new_name != old_name and new_name in self.var_manager.global_variables:
+            if new_name != old_name and new_name in self.var_manager.global_variables:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
-                new_name = old_name
+                new_name = None
             
             # Update variable
             full_path = [old_name] + path[1:]
@@ -79,7 +78,7 @@ class PropertiesPanel(UIPanelBase):
             self.var_manager.edit_variable(
                 value_path=full_path,
                 new_name=new_name,
-                new_type=DataType(new_type),
+                new_type=new_type,
                 new_value=new_value
             )
     
@@ -120,37 +119,41 @@ class PropertiesPanel(UIPanelBase):
             self.render_variable_properties()
     
     def render_widgets(self, layout, schema):
-        """Factory untuk membuat widget berdasarkan tipe data"""
+        """Factory untuk membuat widget berdasarkan tipe data dengan scrollable area"""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        inner_widget = QWidget()
+        inner_layout = QVBoxLayout(inner_widget)
+        inner_layout.setContentsMargins(8, 8, 8, 8)
+
         for name, conf in schema.items():
             t = conf.get("type")
 
             container = QWidget()
-            layout = QHBoxLayout(container)
-            layout.setContentsMargins(0, 2, 0, 2)
+            h_layout = QHBoxLayout(container)
+            h_layout.setContentsMargins(0, 2, 0, 2)
 
             # Buat widget properti berdasarkan tipe data
             widget = PropertyWidgetFactory.create(
-                layout,
+                h_layout,
                 name,
                 conf,
                 lambda v, k=[name]: self.update_prop(v, k),
                 [name]
             )
             if t == DataType.STRUCT and widget:
-                self.layout.addWidget(widget)  # Sudah return GroupBox langsung
+                inner_layout.addWidget(widget)  # Sudah return GroupBox langsung
             else:
-                self.layout.addWidget(container)
-        
-        self.layout.addStretch()
+                inner_layout.addWidget(container)
+
+        inner_layout.addStretch()
+        scroll_area.setWidget(inner_widget)
+        self.layout.addWidget(scroll_area)
 
     def render_variable_properties(self):
         """Membuat UI untuk edit variabel global"""
         name = self.target_data["name"]
         data = self.main_window.var_manager.global_variables.get(name)
-        
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 2, 0, 2)
 
         # Serialize structure
         variable_serializer = {
@@ -169,7 +172,7 @@ class PropertiesPanel(UIPanelBase):
                 "display_name": "Default Value",
                 "type": DataType(data['type']),
                 "options": data['options'] if 'options' in data else None,
-                "list_type": DataType(data['list_type']) if 'list_type' in data else None,
+                "element_type": DataType(data['element_type']) if 'element_type' in data else None,
                 "value": data['value']
             }
         }

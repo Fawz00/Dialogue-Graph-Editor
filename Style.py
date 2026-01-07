@@ -31,7 +31,7 @@ DATA_TYPE_COLORS = {
     DataType.FLOAT: QColor(155, 255, 0),     # Hijau Neon
     DataType.BOOL: QColor(172, 64, 0),       # Merah
     DataType.ENUM: QColor(0, 100, 255),      # Biru Tua
-    DataType.LIST: QColor(255, 165, 0),      # Oranye
+    DataType.ARRAY: QColor(255, 165, 0),      # Oranye
     DataType.STRUCT: QColor(200, 0, 255),    # Ungu
 }
 

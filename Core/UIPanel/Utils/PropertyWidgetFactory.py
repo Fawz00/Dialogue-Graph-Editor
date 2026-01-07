@@ -22,7 +22,7 @@ class PropertyWidgetFactory:
 
         display_name = config.get("display_name", var_name)
 
-        if data_type not in (DataType.STRUCT, DataType.LIST):
+        if data_type not in (DataType.STRUCT, DataType.ARRAY):
             layout.addWidget(QLabel(f"{display_name}:"))
 
         # ---------- STRING ----------
@@ -37,7 +37,7 @@ class PropertyWidgetFactory:
         # ---------- INT ----------
         elif data_type == DataType.INT:
             w = QSpinBox()
-            w.setRange(-999999, 999999)
+            w.setRange(-2147483648, 2147483647)
             try:
                 w.setValue(int(current_value or 0))
             except:
@@ -52,6 +52,8 @@ class PropertyWidgetFactory:
         # ---------- FLOAT ----------
         elif data_type == DataType.FLOAT:
             w = QDoubleSpinBox()
+            w.setDecimals(6)
+            w.setRange(-2147483648.0, 2147483647.0)
             try:
                 w.setValue(float(current_value or 0.0))
             except:
@@ -86,16 +88,16 @@ class PropertyWidgetFactory:
             layout.addWidget(w)
             return w
 
-        # ---------- LIST ----------
-        elif data_type == DataType.LIST:
+        # ---------- ARRAY ----------
+        elif data_type == DataType.ARRAY:
             group = QGroupBox(display_name)
             group_layout = QVBoxLayout(group)
 
-            list_type = config.get("list_type", DataType.STRING)
+            element_type = config.get("element_type", DataType.STRING)
 
             for idx, item_value in enumerate(current_value):
                 item_config = {
-                    "type": list_type,
+                    "type": element_type,
                     "value": item_value
                 }
 
@@ -105,6 +107,25 @@ class PropertyWidgetFactory:
                     group_layout,
                     str(idx),
                     item_config,
+                    on_changed_callback,
+                    item_path
+                )
+
+            layout.addWidget(group)
+            return group
+
+        # ---------- LIST ----------
+        elif data_type == DataType.LIST:
+            group = QGroupBox(display_name)
+            group_layout = QVBoxLayout(group)
+
+            for idx, item_value in enumerate(current_value):
+                item_path = path + [idx]
+
+                PropertyWidgetFactory.create(
+                    group_layout,
+                    str(idx),
+                    item_value,
                     on_changed_callback,
                     item_path
                 )

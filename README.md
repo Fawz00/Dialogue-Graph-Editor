@@ -69,6 +69,51 @@ python Main.py
 - Use the right panel to edit node properties
 - Save, load, and export your dialogue graphs from the File menu
 
+## Note For Myself
+
+Serializable field:
+```
+{
+    "Variable": {
+        "type": DataType.ENUM,
+        "options": ["Var1", "Var2", "Var3"],
+        "value": "Var1"
+    },
+    "Someone": {
+        "type": DataType.OBJECT,
+        "class": "Person",
+        "value": {
+            "name": "John Doe",
+            "age": 26
+        }
+    },
+    "Advanced Settings": {
+        "type": DataType.STRUCT,
+        "value": {
+            "Priority": {"type": DataType.INT, "value": 1},
+            "Interpolate": {"type": DataType.BOOL, "value": False},
+            "Test Float": {"type": DataType.FLOAT, "value": 0.0},
+            "Text": {"type": DataType.STRING, "value": "None"},
+            "Example array":
+            {
+                "type": DataType.ARRAY,
+                "element_type": DataType.STRING,
+                "value": ["Item1", "Item2"]
+            },
+            "Example list":
+            {
+                "type": DataType.LIST,
+                "value": [
+                    {"type": DataType.INT, "value": 10},
+                    {"type": DataType.FLOAT, "value": 3.14},
+                    {"type": DataType.STRING, "value": "Hello"}
+                ]
+            }
+        }
+    }
+}
+```
+
 ## License
 
 Private project only

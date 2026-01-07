@@ -7,5 +7,6 @@ class DataType(Enum):
     BOOL = "boolean"
     ENUM = "enummeration"
     STRUCT = "structure"
+    ARRAY = "array"
     LIST = "list"
-    CLASS = "class"
+    OBJECT = "object"

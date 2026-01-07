@@ -39,7 +39,7 @@ class SetVarNode(BaseNode):
         #             "Priority": Property(type=DataType.INT.value, value=1),
         #             "Interpolate": Property(type=DataType.BOOL.value, value=False),
         #             "Test Float": Property(type=DataType.FLOAT.value, value=0.0),
-        #             "Test List": Property(type=DataType.LIST.value, value=[]),
+        #             "Test Array": Property(type=DataType.ARRAY.value, value=[]),
         #             "Text": Property(type=DataType.STRING.value, value="None")
         #         }
         #     )

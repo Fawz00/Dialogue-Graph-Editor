@@ -9,7 +9,9 @@ from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
 from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence, QIcon
 
 from Core.Debug import Debug
+from Core.EventSystem.Event import Event
 from Core.EventSystem.EventBus import EventBus
+from Core.EventSystem.EventType import EventType
 
 from Core.UIPanel.LogPanel import LogPanel
 from Core.VariableManager import VariableManager
@@ -37,19 +39,19 @@ class MainWindow(QMainWindow):
         self.resize(1000, 700)
         self.setStyleSheet("QMainWindow { background-color: #222; color: #EEE; }")
 
-        # Data logic
-        self.var_manager = VariableManager()
-
         # Editor EventBus
         self.event_bus = EventBus()
+
+        # Data logic
+        self.var_manager = VariableManager(self)
 
         # Setup logger
         Debug.set_main_window(self)
 
         # Connect signal untuk update node jika variabel diubah
-        self.var_manager.variable_updated.connect(self.on_variable_updated)
-        self.var_manager.variable_created.connect(self.on_variable_created)
-        self.var_manager.variable_deleted.connect(self.on_variable_deleted)
+        self.event_bus.subscribe(EventType.EVENT_VARIABLE_UPDATED.value, self.on_variable_updated)
+        self.event_bus.subscribe(EventType.EVENT_VARIABLE_ADDED.value, self.on_variable_created)
+        self.event_bus.subscribe(EventType.EVENT_VARIABLE_REMOVED.value, self.on_variable_deleted)
 
         # Center Canvas
         self.scene = GraphScene()
@@ -303,8 +305,10 @@ class MainWindow(QMainWindow):
     # ===== Handler ketika variabel global diubah =====
     #region Variable Change Handlers
 
-    def on_variable_updated(self, old_name, new_name):
+    def on_variable_updated(self, event: Event):
         """Dipanggil saat variabel diubah"""
+        old_name = event.payload.get("old_name")
+        new_name = event.payload.get("new_name")
         
         # 1. Update logika node dan putus koneksi yang tidak valid (kode sebelumnya)
         for item in self.scene.items():
@@ -320,8 +324,10 @@ class MainWindow(QMainWindow):
         self.var_panel.refresh()
         self.properties_panel.refresh()
     
-    def on_variable_deleted(self, name):
+    def on_variable_deleted(self, event: Event):
         """Dipanggil saat variabel dihapus"""
+        name = event.payload.get("name")
+
         for item in self.scene.items():
             if isinstance(item, SetVarNode):
                 if item.selected_var == name:
@@ -341,7 +347,7 @@ class MainWindow(QMainWindow):
         self.var_panel.refresh()
         self.properties_panel.refresh()
     
-    def on_variable_created(self, name):
+    def on_variable_created(self, event: Event):
         """Dipanggil saat variabel dibuat"""
         # Hanya perlu refresh panel details
         self.var_panel.refresh()

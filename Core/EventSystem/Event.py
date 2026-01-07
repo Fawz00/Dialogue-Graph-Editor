@@ -3,7 +3,6 @@ from typing import Any, Dict
 import time
 import uuid
 
-
 @dataclass(frozen=True)
 class Event:
     type: str
