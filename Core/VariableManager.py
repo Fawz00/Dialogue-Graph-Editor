@@ -131,8 +131,9 @@ class VariableManager(QObject):
         root_meta = self.global_variables[old_var_name]
 
         # Root variable
+        parent = None
+
         if len(value_path) == 1:
-            parent = self.global_variables
             key = old_var_name
             target_meta = root_meta
         else:
@@ -181,7 +182,7 @@ class VariableManager(QObject):
         # CHANGE VALUE
         # =========================
         if new_value is not None:
-            if DataType(parent["type"]) == DataType.ARRAY:
+            if parent is not None and DataType(parent["type"]) == DataType.ARRAY:
                 old_value = target_meta
 
                 # Coba pasang dulu

@@ -1,7 +1,7 @@
 import sys
-from PyQt6.QtWidgets import (QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QVBoxLayout, QFrame)
-from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QVBoxLayout, QFrame, QWidget, QToolButton)
+from PyQt6.QtGui import QPalette, QColor, QIcon
+from PyQt6.QtCore import Qt, QSize
 
 from Core.Enums.DataType import DataType
 from Style import STYLES
@@ -22,7 +22,7 @@ class PropertyWidgetFactory:
 
         display_name = config.get("display_name", var_name)
 
-        if data_type not in (DataType.STRUCT, DataType.ARRAY):
+        if data_type not in (DataType.STRUCT, DataType.ARRAY, DataType.LIST):
             layout.addWidget(QLabel(f"{display_name}:"))
 
         # ---------- STRING ----------
@@ -90,8 +90,7 @@ class PropertyWidgetFactory:
 
         # ---------- ARRAY ----------
         elif data_type == DataType.ARRAY:
-            group = QGroupBox(display_name)
-            group_layout = QVBoxLayout(group)
+            section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
             element_type = config.get("element_type", DataType.STRING)
 
@@ -104,57 +103,109 @@ class PropertyWidgetFactory:
                 item_path = path + [idx]
 
                 PropertyWidgetFactory.create(
-                    group_layout,
+                    content_layout,
                     str(idx),
                     item_config,
                     on_changed_callback,
                     item_path
                 )
 
-            layout.addWidget(group)
-            return group
+            layout.addWidget(section)
+            return section
 
         # ---------- LIST ----------
         elif data_type == DataType.LIST:
-            group = QGroupBox(display_name)
-            group_layout = QVBoxLayout(group)
+            section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
             for idx, item_value in enumerate(current_value):
                 item_path = path + [idx]
 
                 PropertyWidgetFactory.create(
-                    group_layout,
+                    content_layout,
                     str(idx),
                     item_value,
                     on_changed_callback,
                     item_path
                 )
 
-            layout.addWidget(group)
-            return group
+            layout.addWidget(section)
+            return section
 
         # ---------- STRUCT ----------
         elif data_type == DataType.STRUCT:
-            group = QGroupBox(display_name)
-            group_layout = QVBoxLayout(group)
+            section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
             for sub_key, sub_config in current_value.items():
                 sub_path = path + [sub_key]
 
                 PropertyWidgetFactory.create(
-                    group_layout,
+                    content_layout,
                     sub_key,
                     sub_config,
                     on_changed_callback,
                     sub_path
                 )
 
-            layout.addWidget(group)
-            return group
+            layout.addWidget(section)
+            return section
             
-        return PropertyWidgetFactory.create_fallback_widget(current_value) # Fallback
+        return PropertyWidgetFactory._create_fallback_widget(current_value) # Fallback
     
-    def create_fallback_widget(current_value):
+    # ===== HELPER METHODS =====
+    #region Helper Methods
+
+    def _create_collapsible_section(title):
+        header = QToolButton()
+        header.setText(title)
+        header.setCheckable(True)
+        header.setChecked(True)
+        header.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        header.setIconSize(QSize(10, 10))
+        header.setIcon(QIcon("resources/arrow_down.png"))
+        header.setStyleSheet("""
+            QToolButton { 
+                border: none;
+                font-weight: bold;
+            }
+        """)
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(15, 0, 0, 0)
+
+        def toggle(checked):
+            content.setVisible(checked)
+            header.setIcon(
+                QIcon("resources/arrow_down.png") if checked
+                else QIcon("resources/arrow_right.png")
+            )
+
+        header.toggled.connect(toggle)
+
+        # Layout inner: header + separator + content
+        inner_layout = QVBoxLayout()
+        inner_layout.setContentsMargins(0, 0, 0, 0)
+        inner_layout.setSpacing(2)
+        inner_layout.addWidget(header)
+        inner_layout.addWidget(content)
+
+        inner_widget = QWidget()
+        inner_widget.setLayout(inner_layout)
+
+        # --- wrapper outline ---
+        wrapper = QFrame()
+        wrapper.setFrameShape(QFrame.Shape.Box)
+        wrapper.setFrameShadow(QFrame.Shadow.Plain)
+        wrapper.setLineWidth(1)
+        wrapper.setMidLineWidth(0)
+
+        wrapper_layout = QVBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(4, 4, 4, 4)  # jarak dari border
+        wrapper_layout.addWidget(inner_widget)
+
+        return wrapper, content_layout
+
+    def _create_fallback_widget(current_value):
         frame = QFrame()
         frame.setFrameShape(QFrame.Shape.NoFrame)  # matikan frame default
         frame.setAutoFillBackground(True)
@@ -175,3 +226,5 @@ class PropertyWidgetFactory:
         """)
         
         return frame
+    
+    #endregion Helper Methods
