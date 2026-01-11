@@ -39,6 +39,10 @@ class LogPanel(UIPanelBase):
         self.tree = QTreeWidget()
         self.tree.setColumnCount(4)
         self.tree.setHeaderLabels(["Level", "Time", "Message", "Source"])
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setSelectionBehavior(QTreeWidget.SelectionBehavior.SelectRows)
+        self.tree.setUniformRowHeights(False)  # Allow variable row heights for multiline content
+        self.tree.setRootIsDecorated(False)
         self.layout.addWidget(self.tree)
 
         # Add existing logs

@@ -1,14 +1,16 @@
 import sys
+from typing import cast
 from PyQt6.QtWidgets import (QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QVBoxLayout, QFrame, QWidget, QToolButton)
 from PyQt6.QtGui import QPalette, QColor, QIcon
 from PyQt6.QtCore import Qt, QSize
 
 from Core.Enums.DataType import DataType
+from Core.Structures.Variable import Variable
 from Style import STYLES
 
 class PropertyWidgetFactory:
     @staticmethod
-    def create(layout, var_name, config, on_changed_callback, path=None):
+    def create(layout, var_name, config: Variable, on_changed_callback, path=None):
         """
         Menghasilkan widget berdasarkan tipe data.
         on_changed_callback(path, value): fungsi yang dijalankan saat nilai widget berubah.
@@ -17,10 +19,10 @@ class PropertyWidgetFactory:
         if path is None:
             path = []
         
-        data_type = DataType(config.get("type"))
-        current_value = config.get("value")
+        data_type = DataType(config.type)
+        current_value = config.value
 
-        display_name = config.get("display_name", var_name)
+        display_name = config.display_name or var_name
 
         if data_type not in (DataType.STRUCT, DataType.ARRAY, DataType.LIST):
             layout.addWidget(QLabel(f"{display_name}:"))
@@ -78,7 +80,7 @@ class PropertyWidgetFactory:
         # ---------- ENUM ----------
         elif data_type == DataType.ENUM:
             w = QComboBox()
-            options = config.get("options", [])
+            options = config.options or []
             if options:
                 w.addItems(options)
             w.setCurrentText(str(current_value))
@@ -92,14 +94,13 @@ class PropertyWidgetFactory:
         elif data_type == DataType.ARRAY:
             section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
-            element_type = config.get("element_type", DataType.STRING)
+            element_type = config.element_type or DataType.STRING.value
 
             for idx, item_value in enumerate(current_value):
-                item_config = {
-                    "type": element_type,
-                    "value": item_value
-                }
-
+                item_config = Variable(
+                    type=element_type,
+                    value=item_value
+                )
                 item_path = path + [idx]
 
                 PropertyWidgetFactory.create(
@@ -116,6 +117,7 @@ class PropertyWidgetFactory:
         # ---------- LIST ----------
         elif data_type == DataType.LIST:
             section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
+            current_value = cast(list, current_value)
 
             for idx, item_value in enumerate(current_value):
                 item_path = path + [idx]

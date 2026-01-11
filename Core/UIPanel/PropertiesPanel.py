@@ -1,8 +1,10 @@
 import sys
+from typing import cast
 from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QFormLayout, QVBoxLayout,
                              QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox, QMessageBox)
 
 from Core.Nodes.SetVarNode import SetVarNode
+from Core.Structures.Variable import Variable
 from Core.UIPanelBase import UIPanelBase
 from Core.Enums.DataType import DataType
 from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
@@ -27,7 +29,7 @@ class PropertiesPanel(UIPanelBase):
             self.refresh()
             return
 
-        if name not in self.var_manager.global_variables:
+        if self.var_manager.get_variable(name) is None:
             self.target_data = None
             self.refresh()
             return
@@ -54,11 +56,11 @@ class PropertiesPanel(UIPanelBase):
 
         elif self.target_data["type"] == "global_var":
             old_name = self.target_data["name"]
-            old_data = self.var_manager.global_variables.get(old_name)
             
             new_name = None
             new_type = None
             new_value = None
+            new_other_props = {}
 
             if path[0] == "var_name":
                 new_name = value
@@ -66,20 +68,27 @@ class PropertiesPanel(UIPanelBase):
                 new_type = DataType(value)
             elif path[0] == "default_value":
                 new_value = value
+            elif path[0] == "element_type":
+                new_other_props["element_type"] = DataType(value).value
             
             # Validasi
-            if new_name != old_name and new_name in self.var_manager.global_variables:
+            if new_name != old_name and self.var_manager.get_variable(new_name) is not None:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 new_name = None
             
             # Update variable
             full_path = [old_name] + path[1:]
+            new_data = Variable(
+                type=new_type,
+                value=new_value,
+                options=new_other_props.get("options"),
+                element_type=new_other_props.get("element_type")
+            )
 
             self.var_manager.edit_variable(
                 value_path=full_path,
                 new_name=new_name,
-                new_type=new_type,
-                new_value=new_value
+                new_data=new_data
             )
     
     def refresh(self):
@@ -87,7 +96,7 @@ class PropertiesPanel(UIPanelBase):
         self.clear()
             
         if not self.target_data: return
-        if self.target_data["type"] == "global_var" and self.target_data["name"] not in self.var_manager.global_variables:
+        if self.target_data["type"] == "global_var" and self.var_manager.get_variable(self.target_data["name"]) is None:
                 self.target_data = None
                 return
 
@@ -118,7 +127,7 @@ class PropertiesPanel(UIPanelBase):
         elif self.target_data["type"] == "global_var":
             self.render_variable_properties()
     
-    def render_widgets(self, layout, schema):
+    def render_widgets(self, layout, schema: dict[str, Variable]):
         """Factory untuk membuat widget berdasarkan tipe data dengan scrollable area"""
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -127,7 +136,7 @@ class PropertiesPanel(UIPanelBase):
         inner_layout.setContentsMargins(8, 8, 8, 8)
 
         for name, conf in schema.items():
-            t = conf.get("type")
+            t = DataType(conf.type)
 
             container = QWidget()
             h_layout = QHBoxLayout(container)
@@ -153,28 +162,38 @@ class PropertiesPanel(UIPanelBase):
     def render_variable_properties(self):
         """Membuat UI untuk edit variabel global"""
         name = self.target_data["name"]
-        data = self.main_window.var_manager.global_variables.get(name)
+        data = self.main_window.var_manager.get_variable(name)
+        data = cast(Variable, data)
 
         # Serialize structure
         variable_serializer = {
-            "var_name": {
-                "display_name": "Name",
-                "type": DataType.STRING,
-                "value": name
-            },
-            "var_type": {
-                "display_name": "Type",
-                "type": DataType.ENUM,
-                "options": VariableManager.SUPPORTED_TYPES_AS_STRING,
-                "value": DataType(data['type']).value
-            },
-            "default_value": {
-                "display_name": "Default Value",
-                "type": DataType(data['type']),
-                "options": data['options'] if 'options' in data else None,
-                "element_type": DataType(data['element_type']) if 'element_type' in data else None,
-                "value": data['value']
-            }
+            "var_name": Variable(
+                display_name="Name",
+                type=DataType.STRING.value,
+                value=name
+            ),
+            "var_type": Variable(
+                display_name="Type",
+                type=DataType.ENUM.value,
+                options=VariableManager.SUPPORTED_TYPES_AS_STRING,
+                value=DataType(data.type).value
+            ),
+            # If array add element type
+            **({
+                "element_type": Variable(
+                    display_name="Element Type",
+                    type=DataType.ENUM.value,
+                    options=VariableManager.SUPPORTED_TYPES_AS_STRING,
+                    value=DataType(data.element_type if data.element_type is not None else DataType.STRING).value
+                )
+            } if DataType(data.type) == DataType.ARRAY else {}),
+            "default_value": Variable(
+                display_name="Default Value",
+                type=DataType(data.type).value,
+                options=data.options if data.options is not None else None,
+                element_type=DataType(data.element_type).value if data.element_type is not None else None,
+                value=data.value
+            )
         }
 
         self.render_widgets(

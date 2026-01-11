@@ -1,6 +1,6 @@
 from PyQt6.QtGui import QColor
 
-from Core.Structures.Property import Property
+from Core.Structures.Variable import Variable
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
 from Core.BaseNode import BaseNode
@@ -21,7 +21,7 @@ class SetVarNode(BaseNode):
         self.properties = {
             "Variable": {
                 "type": DataType.ENUM, 
-                "options": self.var_manager.global_variables.keys(),
+                "options": self.var_manager.get_all_variables().keys(),
                 "value": ""
             },
             "Value": {
@@ -30,22 +30,7 @@ class SetVarNode(BaseNode):
             }
         }
         
-    def get_properties(self):        
-        # properties = {
-        #     "Variable": Property(type=DataType.ENUM.value, value=self.selected_var, options=var_names),
-        #     "Advanced Settings": Property(
-        #         type=DataType.STRUCT,
-        #         value={
-        #             "Priority": Property(type=DataType.INT.value, value=1),
-        #             "Interpolate": Property(type=DataType.BOOL.value, value=False),
-        #             "Test Float": Property(type=DataType.FLOAT.value, value=0.0),
-        #             "Test Array": Property(type=DataType.ARRAY.value, value=[]),
-        #             "Text": Property(type=DataType.STRING.value, value="None")
-        #         }
-        #     )
-        # }
-        # return properties
-
+    def get_properties(self):
         return self.properties
 
     def set_property(self, key_path: list, value):
@@ -54,13 +39,13 @@ class SetVarNode(BaseNode):
                 return
 
             self.properties["Variable"]["value"] = value
-            var_info = self.var_manager.global_variables.get(value)
+            var_info = self.var_manager.get_variable(value)
 
             # Pastikan tidak invalid
             self.is_valid = var_info is not None
 
             if self.is_valid:
-                new_type = DataType(var_info['type'])
+                new_type = DataType(var_info.type)
 
                 # Perbarui nilai default berdasarkan tipe variabel
                 self.properties["Value"]["type"] = new_type
@@ -77,11 +62,11 @@ class SetVarNode(BaseNode):
     def update_sockets_by_variable(self, var_name):
         """Membangun ulang atau menghapus socket data berdasarkan variabel"""
         self.selected_var = var_name
-        var_info = self.var_manager.global_variables.get(var_name)
+        var_info = self.var_manager.get_variable(var_name)
 
         if var_info:
             # Jika variabel valid, buat kembali socket datanya
-            v_type = DataType(var_info['type'])
+            v_type = DataType(var_info.type)
             self.title = f"Set {var_name}"
 
             if self.in_data is None:
