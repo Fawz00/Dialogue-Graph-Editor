@@ -1,4 +1,5 @@
 from PyQt6.QtCore import QObject, pyqtSignal
+from numpy import var
 
 from Core.Debug import Debug
 from Core.Enums.DataType import DataType
@@ -20,7 +21,20 @@ class VariableManager(QObject):
         DataType.OBJECT: {}
     }
 
-    SUPPORTED_TYPES_AS_STRING = list(dt.value for dt in _DEFAULT_VALUES.keys())
+    SUPPORTED_TYPES_AS_STRING = [
+        DataType.STRING.value,
+        DataType.INT.value,
+        DataType.FLOAT.value,
+        DataType.BOOL.value,
+        DataType.ARRAY.value,
+        DataType.LIST.value,
+    ]
+    PRIMITIVE_TYPES_AS_STRING = [
+        DataType.STRING.value,
+        DataType.INT.value,
+        DataType.FLOAT.value,
+        DataType.BOOL.value
+    ]
 
     def __init__(self, main_window=None):
         super().__init__(main_window)
@@ -77,16 +91,39 @@ class VariableManager(QObject):
     
     # === CRUD Methods ===
     
-    def delete_variable(self, name):
-        if name in self._global_variables:
-            del self._global_variables[name]
+    def delete_global_variable(self, name):
+        success = VariableManager.delete_variable(self._global_variables, name)
+
+        if success:
             self._main_window.event_bus.publish(Event(
                 type=EventType.EVENT_VARIABLE_REMOVED.value,
                 source="VariableManager",
                 payload={"name": name}
             ))
+        
     
-    def edit_variable(self, value_path: list, new_name: str = None, new_data: Variable = None):
+    @staticmethod
+    def delete_variable(database, name) -> bool:
+        if name in database:
+            del database[name]
+            return True
+        return False
+    
+    def edit_global_variable(self, value_path: list, new_name: str = None, new_data: Variable = None):
+        success = VariableManager.edit_variable(self._global_variables, value_path, new_name, new_data)
+
+        if success:
+            self._main_window.event_bus.publish(Event(
+                type=EventType.EVENT_VARIABLE_UPDATED.value,
+                source="VariableManager",
+                payload={
+                    "old_name": value_path[0],
+                    "new_name": new_name or value_path[0]
+                }
+            ))
+    
+    @staticmethod
+    def edit_variable(database, value_path: list, new_name: str = None, new_data: Variable = None) -> bool:
         def get_nested_meta(current_meta: Variable, path: list):
             parent = None
             key = None
@@ -132,15 +169,15 @@ class VariableManager(QObject):
         # Edit variable berdasarkan path
         if not value_path:
             Debug.log_error("Value path is empty in edit_variable.")
-            return
+            return False
 
         old_var_name = value_path[0]
 
-        if old_var_name not in self._global_variables:
+        if old_var_name not in database:
             Debug.log_error(f"Variable '{old_var_name}' does not exist.")
-            return
+            return False
 
-        root_meta = self._global_variables[old_var_name]
+        root_meta = database[old_var_name]
         parent: Variable | dict | list = None
         target_meta: Variable = None
 
@@ -150,7 +187,8 @@ class VariableManager(QObject):
         else:
             parent, key, target_meta = get_nested_meta(root_meta, value_path)
             if target_meta is None:
-                return
+                Debug.log_error(f"Failed to get target meta for path '{value_path}'.")
+                return False
 
         # =========================
         # RENAME / REORDER
@@ -159,18 +197,18 @@ class VariableManager(QObject):
 
             if parent is None:
                 # ROOT VARIABLE RENAME
-                if new_name in self._global_variables:
+                if new_name in database:
                     Debug.log_error(f"Variable '{new_name}' already exists.")
-                    return
+                    return False
 
-                self._global_variables[new_name] = self._global_variables.pop(old_var_name)
+                database[new_name] = database.pop(old_var_name)
                 key = new_name
 
             # STRUCT
             elif isinstance(parent, dict):
                 if new_name in parent:
                     Debug.log_error(f"Variable '{new_name}' already exists.")
-                    return
+                    return False
                 parent[new_name] = parent.pop(key)
                 key = new_name
 
@@ -180,14 +218,14 @@ class VariableManager(QObject):
                     new_index = int(new_name)
                 except ValueError:
                     Debug.log_error("List reorder requires integer index.")
-                    return
+                    return False
 
                 old_index = key
                 list_len = len(parent)
 
                 if not (0 <= new_index < list_len):
                     Debug.log_error(f"Index {new_index} out of range for list reorder.")
-                    return
+                    return False
 
                 if new_index != old_index:
                     item = parent.pop(old_index)
@@ -196,7 +234,7 @@ class VariableManager(QObject):
 
             else:
                 Debug.log_error(f"Invalid parent type ({type(parent)}) for rename/reorder.")
-                return
+                return False
 
         # =========================
         # CHANGE VALUE
@@ -209,7 +247,7 @@ class VariableManager(QObject):
                 parent.value[key] = new_data.value
 
                 # Validasi
-                if not self.is_value_valid(parent.element_type, new_data):
+                if not VariableManager.is_value_valid(parent.element_type, new_data):
                     # Rollback jika invalid
                     parent.value[key] = old_value
                     Debug.log_warning(f"Invalid array element value '{new_data.value}' for type {parent.element_type}.")
@@ -220,10 +258,15 @@ class VariableManager(QObject):
                 target_meta.value = new_data.value
 
                 # Validasi
-                if not self.is_value_valid(target_meta.type, target_meta):
+                if not VariableManager.is_value_valid(target_meta.type, target_meta):
                     # Rollback jika invalid
                     target_meta.value = old_value
-                    Debug.log_warning(f"Invalid value '{new_data.value}' for type {target_meta.type}.")
+
+                    Debug.log_warning(f"Invalid value '{target_meta.value}' for type {target_meta.type}.")
+
+                    # Cek apakah value lama valid, kalau tidak set ke default
+                    if not VariableManager.is_value_valid(target_meta.type, target_meta):
+                        VariableManager.reset_to_default_value(target_meta)
         
         # =========================
         # CHANGE OTHER PROPS
@@ -261,42 +304,39 @@ class VariableManager(QObject):
                 pass  # STRUCT hanya butuh value dict
 
             # Value selalu reset dari sumber kebenaran
-            target_meta.value = VariableManager.convert_value_to_type(target_meta.value, new_data.type)
+            VariableManager.convert_variable_to_type(target_meta, new_data.type)
 
-        # =========================
-        # EMIT EVENT
-        # =========================
-        self._main_window.event_bus.publish(Event(
-            type=EventType.EVENT_VARIABLE_UPDATED.value,
-            source="VariableManager",
-            payload={
-                "old_name": old_var_name,
-                "new_name": new_name or old_var_name
-            }
-        ))
+        return True
     
-    def create_variable(self, name, var_type, value=None):
-        if name in self._global_variables:
-            return  # Sudah ada
+    def create_global_variable(self, name, var_type, value=None):
+        success = VariableManager.create_variable(self._global_variables, name, var_type, value)
+
+        if success:
+            self._main_window.event_bus.publish(Event(
+                type=EventType.EVENT_VARIABLE_ADDED.value,
+                source="VariableManager",
+                payload={"name": name}
+            ))
+
+    @staticmethod
+    def create_variable(database, name, var_type, value=None) -> bool:
+        if name in database:
+            return False  # Sudah ada
         
-        self._global_variables[name] = Variable(
+        database[name] = Variable(
             type=DataType(var_type),
             value=VariableManager.get_default_value(var_type) if value is None else value
         )
 
         if value is not None:
-            self._global_variables[name].value = value
-
-        self._main_window.event_bus.publish(Event(
-            type=EventType.EVENT_VARIABLE_ADDED.value,
-            source="VariableManager",
-            payload={"name": name}
-        ))
+            database[name].value = value
+        
+        return True
     
-    def get_variable(self, name):
+    def get_global_variable(self, name):
         return self._global_variables.get(name, None)
 
-    def get_all_variables(self):
+    def get_all_global_variables(self):
         return self._global_variables
 
 
@@ -312,11 +352,31 @@ class VariableManager(QObject):
         return result
 
     @staticmethod
-    def convert_value_to_type(value, dtype: str | DataType):
+    def reset_to_default_value(var: Variable):
+        if var is None:
+            Debug.log_error("Cannot reset to default value: Variable is None.")
+            return
+        
+        if DataType(var.type) is DataType.ENUM:
+            if var.options and len(var.options) > 0:
+                options_list = list(var.options)
+                var.value = options_list[0]
+            else:
+                var.value = ""
+                Debug.log_warning("ENUM variable has no options to set default value.")
+            return
+        else:
+            var.value = VariableManager.get_default_value(var.type)
+
+    @staticmethod
+    def convert_variable_to_type(var: Variable, dtype: str | DataType):
         """
         Mengonversi nilai ke tipe data tertentu.
         Mengembalikan nilai yang dikonversi atau None jika gagal.
         """
+        if var is None:
+            Debug.log_error("Cannot convert variable: Variable is None.")
+            return
 
         try:
             # ===============================
@@ -324,33 +384,40 @@ class VariableManager(QObject):
             # ===============================
             if isinstance(dtype, str):
                 dtype = DataType(dtype)
+            
+            if var.type != dtype:
+                var.type = dtype.value
 
             # ===============================
             # PRIMITIVE TYPES
             # ===============================
             if dtype == DataType.STRING:
-                return str(value)
+                var.value = str(var.value)
+                return
 
             if dtype == DataType.INT:
-                return int(value)
+                var.value = int(var.value)
+                return
 
             if dtype == DataType.FLOAT:
-                return float(value)
+                var.value = float(var.value)
+                return
 
             if dtype == DataType.BOOL:
-                if isinstance(value, str):
-                    val_lower = value.lower()
+                if isinstance(var.value, str):
+                    val_lower = var.value.lower()
                     if val_lower in ["true", "1", "yes"]:
-                        return True
+                        var.value = True
                     else:
-                        return False
-                return bool(value)
-
+                        var.value = False
+                var.value = bool(var.value)
+                return
+            
         except Exception:
-            return VariableManager.get_default_value(dtype)
+            VariableManager.reset_to_default_value(var)
+        
+        VariableManager.reset_to_default_value(var)
 
-        return VariableManager.get_default_value(dtype)
-    
     @staticmethod
     def is_value_valid(dtype, meta: Variable) -> bool:
         """

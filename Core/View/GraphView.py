@@ -331,7 +331,7 @@ class GraphView(QGraphicsView):
         
         # 2. Menu Set Variable (dengan Sub-menu)
         set_var_menu = menu.addMenu("Add Set Variable")
-        variables = self.main_window.var_manager.get_all_variables()
+        variables = self.main_window.var_manager.get_all_global_variables()
         
         if not variables:
             set_var_menu.setEnabled(False)

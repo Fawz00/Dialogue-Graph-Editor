@@ -95,7 +95,7 @@ class GlobalVariablePanel(UIPanelBase):
         self.tree.itemChanged.connect(self.on_item_changed)
         self.layout.addWidget(self.tree)
 
-        for var_name, var_data in self.var_manager.get_all_variables().items():
+        for var_name, var_data in self.var_manager.get_all_global_variables().items():
             v_type = self.type_combo.currentText()
             v_type = DataType(var_data.type).value if var_data.type else "Unknown"
             item = QTreeWidgetItem([var_name, v_type])
@@ -104,7 +104,7 @@ class GlobalVariablePanel(UIPanelBase):
     
     def on_item_clicked(self, item, column):
         var_name = item.text(0)
-        var_data = self.var_manager.get_variable(var_name)
+        var_data = self.var_manager.get_global_variable(var_name)
         if var_data:
             self.variable_selected.emit(var_name, var_data)
 
@@ -113,7 +113,7 @@ class GlobalVariablePanel(UIPanelBase):
         if not name: return
         
         # Validasi: Cek apakah nama sudah ada
-        if self.var_manager.get_variable(name) is not None:
+        if self.var_manager.get_global_variable(name) is not None:
             QMessageBox.warning(self, "Duplicate Name", f"Variable with name '{name}' already exists!")
             self.name_edit.setStyleSheet("background-color: #ffcccc;") # Feedback merah
             return
@@ -122,7 +122,7 @@ class GlobalVariablePanel(UIPanelBase):
         v_type = self.type_combo.currentText()
         default_val = VariableManager.get_default_value(DataType(v_type))
         
-        self.var_manager.create_variable(name, v_type, default_val)
+        self.var_manager.create_global_variable(name, v_type, default_val)
     
     def delete_variable_item(self, item):
         """Fungsi helper untuk menghapus variabel secara bersih"""
@@ -136,7 +136,7 @@ class GlobalVariablePanel(UIPanelBase):
         )
         
         if confirm == QMessageBox.StandardButton.Yes:
-            self.var_manager.delete_variable(var_name)
+            self.var_manager.delete_global_variable(var_name)
             
             # Hapus dari visual pohon
             index = self.tree.indexOfTopLevelItem(item)
@@ -150,7 +150,7 @@ class GlobalVariablePanel(UIPanelBase):
         row_idx = self.tree.indexOfTopLevelItem(item)
 
         # Ambil list keys untuk mencari nama lama berdasarkan urutan row
-        all_keys = list(self.var_manager.get_all_variables().keys())
+        all_keys = list(self.var_manager.get_all_global_variables().keys())
         if row_idx >= len(all_keys): 
             self.tree.blockSignals(False)
             return
@@ -164,7 +164,7 @@ class GlobalVariablePanel(UIPanelBase):
             if new_name == "":
                 item.setText(0, old_name) # Kembalikan jika kosong
                 new_name = None
-            elif new_name != old_name and self.var_manager.get_variable(new_name) is not None:
+            elif new_name != old_name and self.var_manager.get_global_variable(new_name) is not None:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 item.setText(0, old_name) # Reset ke nama lama di visual
                 new_name = None
@@ -172,15 +172,16 @@ class GlobalVariablePanel(UIPanelBase):
                 new_name = item.text(0)
         
         if column == 1:
-            if item.text(1) != self.var_manager.get_variable(old_name).type:
+            if item.text(1) != self.var_manager.get_global_variable(old_name).type:
                 new_type = item.text(1)
 
         # --- UPDATE MANAGER ---
         new_data = Variable(
             type=new_type,
+            value=None
         )
         
-        self.var_manager.edit_variable(
+        self.var_manager.edit_global_variable(
             value_path=[old_name],
             new_name=new_name,
             new_data=new_data

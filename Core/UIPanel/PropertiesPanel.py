@@ -3,6 +3,7 @@ from typing import cast
 from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QFormLayout, QVBoxLayout,
                              QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox, QMessageBox)
 
+from Core.BaseNode import BaseNode
 from Core.Nodes.SetVarNode import SetVarNode
 from Core.Structures.Variable import Variable
 from Core.UIPanelBase import UIPanelBase
@@ -29,15 +30,16 @@ class PropertiesPanel(UIPanelBase):
             self.refresh()
             return
 
-        if self.var_manager.get_variable(name) is None:
+        if self.var_manager.get_global_variable(name) is None:
             self.target_data = None
             self.refresh()
             return
         
+        self.main_window.view.scene().clearSelection()
         self.target_data = {"type": "global_var", "name": name}
         self.refresh()
 
-    def load_node(self, node):
+    def load_node(self, node: BaseNode):
         """Menampilkan detail node (logika lama)"""
         if node is None:
             self.target_data = None
@@ -72,7 +74,7 @@ class PropertiesPanel(UIPanelBase):
                 new_other_props["element_type"] = DataType(value).value
             
             # Validasi
-            if new_name != old_name and self.var_manager.get_variable(new_name) is not None:
+            if new_name != old_name and self.var_manager.get_global_variable(new_name) is not None:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 new_name = None
             
@@ -85,7 +87,7 @@ class PropertiesPanel(UIPanelBase):
                 element_type=new_other_props.get("element_type")
             )
 
-            self.var_manager.edit_variable(
+            self.var_manager.edit_global_variable(
                 value_path=full_path,
                 new_name=new_name,
                 new_data=new_data
@@ -96,7 +98,7 @@ class PropertiesPanel(UIPanelBase):
         self.clear()
             
         if not self.target_data: return
-        if self.target_data["type"] == "global_var" and self.var_manager.get_variable(self.target_data["name"]) is None:
+        if self.target_data["type"] == "global_var" and self.var_manager.get_global_variable(self.target_data["name"]) is None:
                 self.target_data = None
                 return
 
@@ -162,7 +164,7 @@ class PropertiesPanel(UIPanelBase):
     def render_variable_properties(self):
         """Membuat UI untuk edit variabel global"""
         name = self.target_data["name"]
-        data = self.main_window.var_manager.get_variable(name)
+        data = self.main_window.var_manager.get_global_variable(name)
         data = cast(Variable, data)
 
         # Serialize structure
@@ -183,7 +185,7 @@ class PropertiesPanel(UIPanelBase):
                 "element_type": Variable(
                     display_name="Element Type",
                     type=DataType.ENUM.value,
-                    options=VariableManager.SUPPORTED_TYPES_AS_STRING,
+                    options=VariableManager.PRIMITIVE_TYPES_AS_STRING,
                     value=DataType(data.element_type if data.element_type is not None else DataType.STRING).value
                 )
             } if DataType(data.type) == DataType.ARRAY else {}),

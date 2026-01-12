@@ -19,50 +19,54 @@ class SetVarNode(BaseNode):
         self.out_data = None
 
         self.properties = {
-            "Variable": {
-                "type": DataType.ENUM, 
-                "options": self.var_manager.get_all_variables().keys(),
-                "value": ""
-            },
-            "Value": {
-                "type": DataType.STRING,
-                "value": ""
-            }
+            "Variable": Variable(
+                display_name="Variable",
+                type=DataType.ENUM.value, 
+                options=list(self.var_manager.get_all_global_variables().keys()),
+                value=""
+            ),
+            "Value": Variable(
+                display_name="Value",
+                type=DataType.STRING.value,
+                value=""
+            )
         }
         
     def get_properties(self):
         return self.properties
 
     def set_property(self, key_path: list, value):
-        if key_path[0] == "Variable":
-            if self.properties["Variable"]["value"] == value:
-                return
-
-            self.properties["Variable"]["value"] = value
-            var_info = self.var_manager.get_variable(value)
-
-            # Pastikan tidak invalid
-            self.is_valid = var_info is not None
-
-            if self.is_valid:
-                new_type = DataType(var_info.type)
-
-                # Perbarui nilai default berdasarkan tipe variabel
-                self.properties["Value"]["type"] = new_type
-                self.properties["Value"]["value"] = VariableManager.get_default_value(new_type)
-            
-            self.update_sockets_by_variable(value) # Perbarui socket data
+        var_data = Variable(
+            type=None,
+            value=value
+        )
+        VariableManager.edit_variable(
+            database=self.properties,
+            value_path=key_path,
+            new_data=var_data)
         
-        elif key_path[0] == "Value":
-            # Set nilai yang akan diassign ke variabel kalau ada
-            self.properties["Value"]["value"] = value
-            
+        # Pastikan field Value berubah sesuai tipe variabel
+        if key_path[0] == "Variable":
+            sel_var = self.var_manager.get_global_variable(self.properties["Variable"].value)
+            val_data = Variable(
+                type=DataType(sel_var.type).value,
+                value=None,
+                options=sel_var.options,
+                element_type=sel_var.element_type
+            )
+
+            VariableManager.edit_variable(
+                database=self.properties,
+                value_path=["Value"],
+                new_data=val_data)
+
+        self.update_sockets_by_variable(self.properties["Variable"].value)
         self.update()
 
     def update_sockets_by_variable(self, var_name):
         """Membangun ulang atau menghapus socket data berdasarkan variabel"""
         self.selected_var = var_name
-        var_info = self.var_manager.get_variable(var_name)
+        var_info = self.var_manager.get_global_variable(var_name)
 
         if var_info:
             # Jika variabel valid, buat kembali socket datanya
