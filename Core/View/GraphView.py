@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (QGraphicsView, QMenu, QToolButton)
-from PyQt6.QtCore import Qt, QEvent, QSize
-from PyQt6.QtGui import QPainter, QMouseEvent, QIcon
+from PyQt6.QtCore import Qt, QEvent, QSize, QPoint
+from PyQt6.QtGui import QPainter, QMouseEvent, QIcon, QContextMenuEvent
 
 from Core.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
@@ -21,6 +21,7 @@ class GraphView(QGraphicsView):
             | QPainter.RenderHint.SmoothPixmapTransform
         )
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         # Sembunyikan Scrollbar agar terlihat lebih clean (opsional)
         # self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -47,6 +48,13 @@ class GraphView(QGraphicsView):
         # Optional: style biar kelihatan overlay
         self.zoom_in_btn.setAutoRaise(True)
         self.zoom_out_btn.setAutoRaise(True)
+
+        # Custom context menu
+        self._right_button_pressed = False
+        self._dragging = False
+        self._press_pos = QPoint()
+        self._last_pos = QPoint()
+        self._drag_threshold = 5
 
         self._update_button_positions()
     
@@ -76,9 +84,15 @@ class GraphView(QGraphicsView):
             super().keyPressEvent(event)
         
     def mousePressEvent(self, event):
-        # Deteksi Tombol Tengah Mouse (Panning)
-        if event.button() == Qt.MouseButton.MiddleButton:
-            self.middle_mouse_button_press(event)
+        # Deteksi Tombol Kanan Mouse (Panning)
+        if event.button() == Qt.MouseButton.RightButton:
+            self._right_button_pressed = True
+            self._dragging = False
+            self._press_pos = event.pos()
+            self._last_pos = event.pos()
+            event.accept()
+            return
+        
         else:
             # Perilaku standar untuk tombol kiri/kanan (koneksi, seleksi, dsb)
             item = self.itemAt(event.pos())
@@ -109,14 +123,53 @@ class GraphView(QGraphicsView):
             super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event):
+        # === PRIORITAS 1: Drag edge ===
         if self.scene().temp_edge:
             self.scene().temp_edge.cur_mouse_pos = self.mapToScene(event.pos())
             self.scene().temp_edge.update_path()
+            return
+
+        # === PRIORITAS 2: Right-click panning ===
+        if self._right_button_pressed:
+            delta_from_press = event.pos() - self._press_pos
+
+            if not self._dragging and delta_from_press.manhattanLength() > self._drag_threshold:
+                self._dragging = True
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+
+            if self._dragging:
+                delta = event.pos() - self._last_pos
+                self._last_pos = event.pos()
+
+                self.horizontalScrollBar().setValue(
+                    self.horizontalScrollBar().value() - delta.x()
+                )
+                self.verticalScrollBar().setValue(
+                    self.verticalScrollBar().value() - delta.y()
+                )
+
+                event.accept()
+                return
+
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton:
-            self.middle_mouse_button_release(event)
+        if event.button() == Qt.MouseButton.RightButton:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+            # Klik kanan diam → context menu
+            if not self._dragging:
+                self.contextMenuEvent(
+                    QContextMenuEvent(
+                        QContextMenuEvent.Reason.Mouse,
+                        event.pos(),
+                        event.globalPosition().toPoint()
+                    )
+                )
+
+            self._right_button_pressed = False
+            self._dragging = False
+            event.accept()
             return
 
         if self.scene().temp_edge:
@@ -166,29 +219,6 @@ class GraphView(QGraphicsView):
             if self.zoom_level > self.zoom_range[0]:
                 self.scale(1 / self.zoom_factor, 1 / self.zoom_factor)
                 self.zoom_level -= 1
-    
-    def middle_mouse_button_press(self, event):
-        """Aktifkan mode geser (ScrollHandDrag)"""
-        release_event = QMouseEvent(QEvent.Type.MouseButtonRelease, event.position(), 
-                                    Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, 
-                                    event.modifiers())
-        super().mouseReleaseEvent(release_event)
-        
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        
-        # Simulasikan klik kiri agar ScrollHandDrag langsung berjalan
-        fake_event = QMouseEvent(event.type(), event.position(), 
-                                 Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, 
-                                 event.modifiers())
-        super().mousePressEvent(fake_event)
-
-    def middle_mouse_button_release(self, event):
-        """Kembalikan mode ke seleksi kotak (RubberBandDrag)"""
-        fake_event = QMouseEvent(event.type(), event.position(), 
-                                 Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, 
-                                 event.modifiers())
-        super().mouseReleaseEvent(fake_event)
-        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
 
     #endregion Input Events
     

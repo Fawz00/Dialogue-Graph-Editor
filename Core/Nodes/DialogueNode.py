@@ -3,14 +3,20 @@ from PyQt6.QtGui import QColor
 from Core.Structures.Variable import Variable
 from Core.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
+from Core.VariableManager import VariableManager
 
 class DialogueNode(BaseNode):
     def __init__(self):
         super().__init__("Dialogue")
         self.header_color = QColor(50, 100, 200, 200) # Biru
         self.properties = {
-            "dialogue_speaker": Variable(
+            "speaker": Variable(
                 display_name="Speaker",
+                type=DataType.STRING.value,
+                value=""
+            ),
+            "text": Variable(
+                display_name="Dialogue Text",
                 type=DataType.STRING.value,
                 value=""
             ),
@@ -40,9 +46,14 @@ class DialogueNode(BaseNode):
         return self.properties
 
     def set_property(self, key_path: list, value):
-        if key_path[0] == "dialogue_speaker":
-            self.properties["dialogue_speaker"].value = value
+        VariableManager.edit_variable(
+            database=self.properties,
+            value_path=key_path,
+            new_data=Variable(
+                type=None,
+                value=value
+            )
+        )
 
-        elif key_path[0] == "choices":
-            self.properties["choices"].value = [x.strip() for x in value.split(",") if x.strip()]
+        if key_path[0] == "choices":
             self.refresh_outputs()
