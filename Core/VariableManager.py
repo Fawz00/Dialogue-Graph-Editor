@@ -247,7 +247,7 @@ class VariableManager(QObject):
                 parent.value[key] = new_data.value
 
                 # Validasi
-                if not VariableManager.is_value_valid(parent.element_type, new_data):
+                if not VariableManager.is_value_valid(new_data, parent.element_type):
                     # Rollback jika invalid
                     parent.value[key] = old_value
                     Debug.log_warning(f"Invalid array element value '{new_data.value}' for type {parent.element_type}.")
@@ -258,14 +258,14 @@ class VariableManager(QObject):
                 target_meta.value = new_data.value
 
                 # Validasi
-                if not VariableManager.is_value_valid(target_meta.type, target_meta):
+                if not VariableManager.is_value_valid(target_meta):
                     # Rollback jika invalid
                     target_meta.value = old_value
 
                     Debug.log_warning(f"Invalid value '{target_meta.value}' for type {target_meta.type}.")
 
                     # Cek apakah value lama valid, kalau tidak set ke default
-                    if not VariableManager.is_value_valid(target_meta.type, target_meta):
+                    if not VariableManager.is_value_valid(target_meta):
                         VariableManager.reset_to_default_value(target_meta)
         
         # =========================
@@ -419,7 +419,7 @@ class VariableManager(QObject):
         VariableManager.reset_to_default_value(var)
 
     @staticmethod
-    def is_value_valid(dtype, meta: Variable) -> bool:
+    def is_value_valid(meta: Variable, dtype: DataType|str = None) -> bool:
         """
         Mengecek apakah value valid untuk DataType tertentu
         berdasarkan metadata variabel.
@@ -429,8 +429,10 @@ class VariableManager(QObject):
             # ===============================
             # NORMALISASI TYPE
             # ===============================
-            if isinstance(dtype, str):
-                dtype = DataType(dtype)
+            if dtype is None:
+                dtype = meta.type
+
+            dtype = DataType(dtype)
 
             value = meta.value
 
@@ -470,13 +472,12 @@ class VariableManager(QObject):
             if dtype == DataType.ARRAY:
                 if not isinstance(value, list):
                     return False
-
-                element_type = meta.element_type
-                if not element_type:
-                    return True
+                
+                if not meta.element_type:
+                    return False
 
                 for item in value:
-                    if not VariableManager.is_value_valid(element_type, Variable(value=item)):
+                    if not VariableManager.is_value_valid(Variable(value=item, type=meta.element_type)):
                         return False
                 return True
 
@@ -488,7 +489,7 @@ class VariableManager(QObject):
                     return False
 
                 for item in value:
-                    if not VariableManager.is_value_valid(element_type, Variable(value=item)):
+                    if not VariableManager.is_value_valid(item):
                         return False
                 return True
 
@@ -510,7 +511,7 @@ class VariableManager(QObject):
                     field_type = field_meta.get("type")
                     field_value = value[key]
 
-                    if not VariableManager.is_value_valid(field_type, Variable(value=field_value)):
+                    if not VariableManager.is_value_valid(Variable(value=field_value, type=field_type)):
                         return False
                 return True
 

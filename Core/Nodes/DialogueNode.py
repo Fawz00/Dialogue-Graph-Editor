@@ -1,7 +1,7 @@
 from PyQt6.QtGui import QColor
 
 from Core.Structures.Variable import Variable
-from Core.BaseNode import BaseNode
+from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
 
@@ -29,6 +29,7 @@ class DialogueNode(BaseNode):
         }
         
         self.add_socket(True, True) # Input flow
+        self._setup_inline_editors()
         self.refresh_outputs()
 
     def refresh_outputs(self):
@@ -45,15 +46,17 @@ class DialogueNode(BaseNode):
     def get_properties(self):
         return self.properties
 
-    def set_property(self, key_path: list, value):
-        VariableManager.edit_variable(
-            database=self.properties,
-            value_path=key_path,
-            new_data=Variable(
-                type=None,
-                value=value
-            )
-        )
+    def set_property(self, key_path: list, value):        
+        super().set_property(key_path, value)
 
         if key_path[0] == "choices":
             self.refresh_outputs()
+    
+    def _setup_inline_editors(self):
+        speaker = self.add_socket(True, False, DataType.STRING)
+        text = self.add_socket(True, False, DataType.STRING)
+        choices = self.add_socket(True, False, DataType.ARRAY)
+
+        self.add_inline_input(speaker, "speaker")
+        self.add_inline_input(text, "text")
+        self.add_inline_input(choices, "choices")

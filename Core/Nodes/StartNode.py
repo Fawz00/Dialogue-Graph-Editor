@@ -1,6 +1,6 @@
 from PyQt6.QtGui import QColor
 
-from Core.BaseNode import BaseNode
+from Core.Graph.BaseNode import BaseNode
 
 class StartNode(BaseNode):
     def __init__(self):

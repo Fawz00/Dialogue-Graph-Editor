@@ -1,16 +1,17 @@
 import sys
 from typing import cast
-from PyQt6.QtWidgets import (QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QVBoxLayout, QFrame, QWidget, QToolButton)
-from PyQt6.QtGui import QPalette, QColor, QIcon
+from PyQt6.QtWidgets import (QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QVBoxLayout, QHBoxLayout, QFrame, QWidget, QToolButton, QMenu)
+from PyQt6.QtGui import QPalette, QColor, QIcon, QAction
 from PyQt6.QtCore import Qt, QSize
 
 from Core.Enums.DataType import DataType
 from Core.Structures.Variable import Variable
+from Core.VariableManager import VariableManager
 from Style import STYLES
 
 class PropertyWidgetFactory:
     @staticmethod
-    def create(layout, var_name, config: Variable, on_changed_callback, path=None):
+    def create(layout: QHBoxLayout, var_name, config: Variable, on_changed_callback, path=None):
         """
         Menghasilkan widget berdasarkan tipe data.
         on_changed_callback(path, value): fungsi yang dijalankan saat nilai widget berubah.
@@ -95,8 +96,11 @@ class PropertyWidgetFactory:
             section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
             element_type = config.element_type or DataType.STRING.value
+            current_value = cast(list, current_value)
 
             for idx, item_value in enumerate(current_value):
+                row = QHBoxLayout()
+
                 item_config = Variable(
                     type=element_type,
                     value=item_value
@@ -104,13 +108,35 @@ class PropertyWidgetFactory:
                 item_path = path + [idx]
 
                 PropertyWidgetFactory.create(
-                    content_layout,
+                    row,
                     str(idx),
                     item_config,
                     on_changed_callback,
                     item_path
                 )
 
+                PropertyWidgetFactory._create_item_action_button(
+                    row,
+                    idx,
+                    item_path,
+                    current_value,
+                    on_changed_callback
+                )
+
+                content_layout.addLayout(row)
+
+            def add_item():
+                new_value = current_value + [
+                    VariableManager.get_default_value(element_type)
+                ]
+                on_changed_callback(path, new_value)
+
+            add_btn = QToolButton()
+            add_btn.setText("Add")
+            add_btn.setIcon(QIcon.fromTheme("list-add"))
+            add_btn.clicked.connect(add_item)
+
+            content_layout.addWidget(add_btn)
             layout.addWidget(section)
             return section
 
@@ -155,6 +181,51 @@ class PropertyWidgetFactory:
     
     # ===== HELPER METHODS =====
     #region Helper Methods
+
+    @staticmethod
+    def _create_item_action_button(
+        parent_layout,
+        index,
+        path,
+        current_list,
+        on_changed_callback
+    ):
+        btn = QToolButton()
+        btn.setText("⋮")
+        btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+
+        menu = QMenu(btn)
+
+        # Remove
+        remove_action = QAction("Remove", btn)
+        def remove():
+            new_list = current_list[:index] + current_list[index+1:]
+            on_changed_callback(path[:-1], new_list)
+        remove_action.triggered.connect(remove)
+        menu.addAction(remove_action)
+
+        # Move Up
+        if index > 0:
+            up_action = QAction("Move Up", btn)
+            def move_up():
+                new_list = current_list[:]
+                new_list[index-1], new_list[index] = new_list[index], new_list[index-1]
+                on_changed_callback(path[:-1], new_list)
+            up_action.triggered.connect(move_up)
+            menu.addAction(up_action)
+
+        # Move Down
+        if index < len(current_list) - 1:
+            down_action = QAction("Move Down", btn)
+            def move_down():
+                new_list = current_list[:]
+                new_list[index+1], new_list[index] = new_list[index], new_list[index+1]
+                on_changed_callback(path[:-1], new_list)
+            down_action.triggered.connect(move_down)
+            menu.addAction(down_action)
+
+        btn.setMenu(menu)
+        parent_layout.addWidget(btn)
 
     def _create_collapsible_section(title):
         header = QToolButton()

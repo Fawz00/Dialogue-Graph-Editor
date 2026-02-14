@@ -114,6 +114,12 @@ class SocketItem(QGraphicsItem):
         # Simpan referensi ke daftar edges di masing-masing socket
         current_sock.edges.append(edge)
         target_sock.edges.append(edge)
+
+        if self.parent_node:
+            self.parent_node._recalculate_layout()
+        
+        if target_sock.parent_node:
+            target_sock.parent_node._recalculate_layout()
         
         return edge
 
@@ -136,23 +142,31 @@ class SocketItem(QGraphicsItem):
             # Hapus visual dari scene
             if edge.scene():
                 self.scene().removeItem(edge)
+        
+        if self.parent_node:
+            self.parent_node._recalculate_layout()
 
     def destroy(self):
-        # Hapus referensi node induk
-        if self.parent_node:
-            self.parent_node.inputs = [s for s in self.parent_node.inputs if s != self]
-            self.parent_node.outputs = [s for s in self.parent_node.outputs if s != self]
-            self.parent_node = None
-
         # Hapus semua edge yang terhubung
         for edge in self.edges[:]:
             edge = cast('EdgeItem', edge)
             if edge in edge.start_socket.edges:
                 edge.start_socket.edges.remove(edge)
+                if edge.start_socket.parent_node:
+                    edge.start_socket.parent_node._recalculate_layout()
             if edge in edge.end_socket.edges:
                 edge.end_socket.edges.remove(edge)
+                if edge.end_socket.parent_node:
+                        edge.end_socket.parent_node._recalculate_layout()
             if edge.scene():
                 edge.scene().removeItem(edge)
+        
+        # Hapus referensi node induk
+        if self.parent_node:
+            self.parent_node.inputs = [s for s in self.parent_node.inputs if s != self]
+            self.parent_node.outputs = [s for s in self.parent_node.outputs if s != self]
+
+            self.parent_node = None
         
         self.edges.clear()
         

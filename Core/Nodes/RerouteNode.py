@@ -1,7 +1,7 @@
 from PyQt6.QtGui import QColor, QBrush, QPen
 from PyQt6.QtCore import Qt
 
-from Core.BaseNode import BaseNode
+from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
 from Style import STYLES, DATA_TYPE_COLORS
 
@@ -11,6 +11,7 @@ class RerouteNode(BaseNode):
         self.radius = 16
         self.width = 20
         self.height = 20
+        self.content_width = 5
         self.is_reroute = True
         self.is_removable = True
         
@@ -23,7 +24,7 @@ class RerouteNode(BaseNode):
         color = DATA_TYPE_COLORS.get(DataType(self.in_socket.data_type), STYLES['error']) if not self.in_socket.is_exec else STYLES['socket_exec']
         painter.setBrush(QBrush(color))
         painter.setPen(QPen(STYLES['node_sel_border'], 2) if self.isSelected() else QPen(Qt.PenStyle.NoPen))
-        painter.drawEllipse(int(self.width/2)-int(self.radius/2)-0, int(self.height/2)-int(self.radius/2)+4, self.radius, self.radius)
+        painter.drawEllipse(int(self.width/2)-int(self.radius/2)-0, int(self.height/2)-int(self.radius/2)+12, self.radius, self.radius)
 
     def update_type(self, is_exec, new_type):
         """Mengubah tipe reroute mengikuti kabel yang terhubung"""

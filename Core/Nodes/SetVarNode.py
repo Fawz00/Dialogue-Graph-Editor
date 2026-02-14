@@ -3,13 +3,13 @@ from PyQt6.QtGui import QColor
 from Core.Structures.Variable import Variable
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
-from Core.BaseNode import BaseNode
+from Core.Graph.BaseNode import BaseNode
 
 class SetVarNode(BaseNode):
-    def __init__(self, var_manager: VariableManager):
+    def __init__(self):
         super().__init__("Set Variable")
         self.header_color = QColor(50, 150, 50, 200)
-        self.var_manager = var_manager
+        self.var_manager = self.main_window.var_manager
 
         # 1. Socket Alur (Exec)
         self.add_socket(True, True)
@@ -36,14 +36,7 @@ class SetVarNode(BaseNode):
         return self.properties
 
     def set_property(self, key_path: list, value):
-        var_data = Variable(
-            type=None,
-            value=value
-        )
-        VariableManager.edit_variable(
-            database=self.properties,
-            value_path=key_path,
-            new_data=var_data)
+        super().set_property(key_path, value)
         
         # Pastikan field Value berubah sesuai tipe variabel
         if key_path[0] == "Variable":

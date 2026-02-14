@@ -5,18 +5,21 @@ from Core.Enums.DataType import DataType
 
 @dataclass
 class Variable:
-    type: str
+    type: DataType
     value: Any
 
     # Optional metadata for variable
     options: Optional[List[Any]] = None     # For ENUM types
-    element_type: Optional[str] = None      # For ARRAY types
+    element_type: Optional[DataType] = None      # For ARRAY types
     class_id: Optional[str] = None          # For custom class/Object types
 
     display_name: Optional[str] = None      # Localization fallback
     localization_key: Optional[str] = None
     comment: Optional[str] = None
     placeholder: Optional[str] = None       # For STRING, UI display
+    editable: bool = True                   # Can be edited in UI
+    meta_editable: bool = True              # Can edit metadata in UI
+    hints: Optional[Dict[str, Any]] = None  # Additional hints for UI or processing
 
     _id: str = field(default_factory=lambda: uuid4().hex, init=False, repr=False)
 
@@ -28,7 +31,8 @@ class Variable:
 
 @dataclass
 class TypeMetadata:
-    element_type: Optional["DataType"] = None
+    options: Optional[List[Any]] = None
+    element_type: Optional[DataType] = None
     class_id: Optional[str] = None
 
 @dataclass
@@ -37,5 +41,6 @@ class UIMetadata:
     localization_key: Optional[str] = None
     comment: Optional[str] = None
     placeholder: Optional[str] = None
-    options: Optional[List[Any]] = None
     hints: Optional[Dict[str, Any]] = None
+    editable: bool = True
+    meta_editable: bool = True

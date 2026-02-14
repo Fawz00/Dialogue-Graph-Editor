@@ -1,10 +1,12 @@
 import sys
 from PyQt6.QtWidgets import (QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, 
                              QPushButton, QComboBox, QTreeWidget, QTreeWidgetItem, QMenu)
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from Core.Debug import Debug
 from Core.Enums.DataType import DataType
+from Core.EventSystem.Event import Event
+from Core.EventSystem.EventType import EventType
 from Core.Nodes.SetVarNode import SetVarNode
 from Core.UIPanelBase import UIPanelBase
 from Core.VariableManager import VariableManager
@@ -18,7 +20,21 @@ class GlobalVariablePanel(UIPanelBase):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.refresh()
+
+        main_window.event_bus.subscribe(EventType.EVENT_VARIABLE_UPDATED.value, self._on_variable_updated)
+        main_window.event_bus.subscribe(EventType.EVENT_VARIABLE_ADDED.value, self._on_variable_created)
+        main_window.event_bus.subscribe(EventType.EVENT_VARIABLE_REMOVED.value, self._on_variable_deleted)
     
+    # ========== Event Handlers ==========
+    def _on_variable_created(self, event: Event):
+        self.refresh()
+    def _on_variable_deleted(self, event: Event):
+        self.refresh()
+    def _on_variable_updated(self, event: Event):
+        self.refresh()
+    
+    # ========== UI Methods ==========
+
     def clear(self):
         # 1. Putuskan sinyal tree lama (kalau ada)
         if hasattr(self, "tree") and self.tree:

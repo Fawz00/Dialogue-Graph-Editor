@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (QGraphicsView, QMenu, QToolButton)
 from PyQt6.QtCore import Qt, QEvent, QSize, QPoint
 from PyQt6.QtGui import QPainter, QMouseEvent, QIcon, QContextMenuEvent
 
-from Core.BaseNode import BaseNode
+from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
 from Core.Graph.EdgeItem import EdgeItem
 from Core.Graph.SocketItem import SocketItem
@@ -256,7 +256,7 @@ class GraphView(QGraphicsView):
                 self.spawn_node(DialogueNode(), pos)
             elif selected_action and selected_action.parent() == set_var_menu:
                 var_name = selected_action.data()
-                node = SetVarNode(self.main_window.var_manager)
+                node = SetVarNode()
                 self.spawn_node(node, pos)
                 node.set_property(["Variable"], var_name) # Otomatis set variabelnya
             elif selected_action == act_reroute:
@@ -309,7 +309,7 @@ class GraphView(QGraphicsView):
             new_node = DialogueNode()
         elif selected_action and selected_action.parent() == set_var_menu:
             var_name = selected_action.data()
-            new_node = SetVarNode(self.main_window.var_manager)
+            new_node = SetVarNode()
             new_node.set_property(["Variable"], var_name)
         elif selected_action == act_reroute:
             start_sock = self.scene().start_socket

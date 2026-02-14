@@ -15,7 +15,7 @@ from Core.EventSystem.EventType import EventType
 
 from Core.UIPanel.LogPanel import LogPanel
 from Core.VariableManager import VariableManager
-from Core.BaseNode import BaseNode
+from Core.Graph.BaseNode import BaseNode
 
 from Core.Graph.SocketItem import SocketItem
 from Core.Graph.EdgeItem import EdgeItem
@@ -50,7 +50,6 @@ class MainWindow(QMainWindow):
 
         # Connect signal untuk update node jika variabel diubah
         self.event_bus.subscribe(EventType.EVENT_VARIABLE_UPDATED.value, self.on_variable_updated)
-        self.event_bus.subscribe(EventType.EVENT_VARIABLE_ADDED.value, self.on_variable_created)
         self.event_bus.subscribe(EventType.EVENT_VARIABLE_REMOVED.value, self.on_variable_deleted)
 
         # Center Canvas
@@ -68,6 +67,7 @@ class MainWindow(QMainWindow):
         self.setup_menu()
 
         # Tambahkan Start Node DI AKHIR inisialisasi
+        BaseNode.main_window = self
         self.create_initial_nodes()
 
     def setup_docks(self):
@@ -103,41 +103,41 @@ class MainWindow(QMainWindow):
         self.var_panel.variable_selected.connect(self.properties_panel.load_variable)        
     
     def setup_toolbar(self):
-        toolbar = QToolBar("Execution Control")
-        toolbar.setIconSize(QSize(18, 18))
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-        toolbar.setMovable(False)
+        self.toolbar = QToolBar("Execution Control")
+        self.toolbar.setIconSize(QSize(18, 18))
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
+        self.toolbar.setMovable(False)
 
         # Left Spacer
         left_spacer = QWidget()
         left_spacer.setSizePolicy(
             QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         )
-        toolbar.addWidget(left_spacer)
+        self.toolbar.addWidget(left_spacer)
 
         # Action Run
         self.run_act = QAction(QIcon("resources/run.png"), "Run", self)
         self.run_act.triggered.connect(self.on_run_pressed)
-        toolbar.addAction(self.run_act)
+        self.toolbar.addAction(self.run_act)
 
         # Action Pause
         self.pause_act = QAction(QIcon("resources/pause.png"), "Pause", self)
         self.pause_act.setEnabled(False) # Mati sampai dijalankan
         self.pause_act.triggered.connect(self.on_pause_pressed)
-        toolbar.addAction(self.pause_act)
+        self.toolbar.addAction(self.pause_act)
 
         # Action Stop
         self.stop_act = QAction(QIcon("resources/stop.png"), "Stop", self)
         self.stop_act.setEnabled(False)
         self.stop_act.triggered.connect(self.on_stop_pressed)
-        toolbar.addAction(self.stop_act)
+        self.toolbar.addAction(self.stop_act)
 
         # Right Spacer
         right_spacer = QWidget()
         right_spacer.setSizePolicy(
             QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         )
-        toolbar.addWidget(right_spacer)
+        self.toolbar.addWidget(right_spacer)
 
     def setup_menu(self):
         self.menu_bar = self.menuBar()
@@ -206,6 +206,7 @@ class MainWindow(QMainWindow):
         window_menu.addAction(self.dock_vars.toggleViewAction())
         window_menu.addAction(self.dock_props.toggleViewAction())
         window_menu.addAction(self.log_dock.toggleViewAction())
+        window_menu.addAction(self.toolbar.toggleViewAction())
 
         # === HELP MENU ===
         help_menu = self.menu_bar.addMenu("&Help")
@@ -239,6 +240,7 @@ class MainWindow(QMainWindow):
         self.dock_vars.setVisible(True)
         self.dock_props.setVisible(True)
         self.log_dock.setVisible(True)
+        self.toolbar.setVisible(True)
         
         # 2. Kembalikan ke posisi awal (Floating false, area specific)
         self.dock_vars.setFloating(False)
@@ -248,6 +250,7 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_vars)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
+        self.toolbar.toggleViewAction().setChecked(True)
         
         # Opsional: Reset ukuran window utama jika mau
         # self.resize(1000, 700)
@@ -344,12 +347,6 @@ class MainWindow(QMainWindow):
                     item.update_sockets_by_variable("")
         
         # 2. REFRESH PANEL DETAILS
-        self.var_panel.refresh()
-        self.properties_panel.refresh()
-    
-    def on_variable_created(self, event: Event):
-        """Dipanggil saat variabel dibuat"""
-        # Hanya perlu refresh panel details
         self.var_panel.refresh()
         self.properties_panel.refresh()
     

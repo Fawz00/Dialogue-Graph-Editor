@@ -2,20 +2,34 @@ import sys
 from typing import cast
 from PyQt6.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QFormLayout, QVBoxLayout,
                              QHBoxLayout, QSpinBox, QCheckBox, QDoubleSpinBox, QGroupBox, QMessageBox)
+from PyQt6.QtWidgets import QScrollArea
 
-from Core.BaseNode import BaseNode
+from Core.EventSystem.EventType import EventType
+from Core.Graph.BaseNode import BaseNode
 from Core.Nodes.SetVarNode import SetVarNode
 from Core.Structures.Variable import Variable
 from Core.UIPanelBase import UIPanelBase
 from Core.Enums.DataType import DataType
 from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
 from Core.VariableManager import VariableManager
-from PyQt6.QtWidgets import QScrollArea
+from Core.EventSystem.Event import Event
 
 class PropertiesPanel(UIPanelBase):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.target_data = None
+
+        main_window.event_bus.subscribe(EventType.EVENT_VARIABLE_UPDATED.value, self._on_variable_updated)
+        main_window.event_bus.subscribe(EventType.EVENT_VARIABLE_ADDED.value, self._on_variable_created)
+        main_window.event_bus.subscribe(EventType.EVENT_VARIABLE_REMOVED.value, self._on_variable_deleted)
+    
+    # ========== Event Handlers ==========
+    def _on_variable_created(self, event: Event):
+        self.refresh()
+    def _on_variable_deleted(self, event: Event):
+        self.refresh()
+    def _on_variable_updated(self, event: Event):
+        self.refresh()
 
     def clear(self):
         # Bersihkan layout
