@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (QGraphicsView, QMenu, QToolButton)
 from PyQt6.QtCore import Qt, QEvent, QSize, QPoint
-from PyQt6.QtGui import QPainter, QMouseEvent, QIcon, QContextMenuEvent
+from PyQt6.QtGui import QPainter, QMouseEvent, QIcon, QContextMenuEvent, QAction
 
 from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
@@ -115,12 +115,27 @@ class GraphView(QGraphicsView):
     
     def mouseDoubleClickEvent(self, event):
         item = self.itemAt(event.pos())
-        
-        # Jika double click pada kabel (EdgeItem)
+
+        # Cari parent node
+        node_item = item
+        while node_item and not isinstance(node_item, BaseNode):
+            node_item = node_item.parentItem()
+
+        # === NODE ===
+        if isinstance(node_item, BaseNode):
+            self.resetTransform()
+            self.zoom_level = 0
+            self.centerOn(node_item)
+            return
+
+        # === EDGE ===
         if isinstance(item, EdgeItem):
             self._create_reroute_on_edge(item, self.mapToScene(event.pos()))
-        else:
-            super().mouseDoubleClickEvent(event)
+            return
+
+        # Default behavior
+        super().mouseDoubleClickEvent(event)
+        
 
     def mouseMoveEvent(self, event):
         # === PRIORITAS 1: Drag edge ===
@@ -196,7 +211,12 @@ class GraphView(QGraphicsView):
                 pos_in_scene = self.mapToScene(event.pos())
                 
                 # PENTING: Menu dipanggil di sini, kabel masih terlihat
-                self._show_context_menu_at_drop(event.globalPosition().toPoint(), pos_in_scene)
+                self._show_context_menu(
+                    event.globalPosition().toPoint(),
+                    pos_in_scene,
+                    item=item,
+                    mode="edge_drop"
+                )
                 
                 # Setelah menu selesai (dipilih atau dicancel), baru hapus kabel sementara
                 if self.scene().temp_edge:
@@ -232,36 +252,35 @@ class GraphView(QGraphicsView):
     def contextMenuEvent(self, event):
         pos = self.mapToScene(event.pos())
         item = self.itemAt(event.pos())
-        
+
         if isinstance(item, BaseNode):
-            # Menu hapus untuk node (Logika sudah kita buat sebelumnya)
             menu = QMenu()
-            if not item.isSelected():
-                self.scene().clearSelection()
-                item.setSelected(True)
-            
+
+            # Change selected to `item`
+            item.setSelected(True)
+
+            act_focus = menu.addAction("Focus This Node")
             act_del = menu.addAction("Delete Node")
-            if not item.is_removable:
-                act_del.setEnabled(False)
+            act_del.setEnabled(item.is_removable)
+
+            selected_menu = menu.exec(event.globalPos())
+
+            if selected_menu == act_focus:
+                self.resetTransform()
+                self.zoom_level = 0
+                self.centerOn(item)
             
-            action = menu.exec(event.globalPos())
-            if action == act_del: self._delete_selected_nodes()
-            
-        else:
-            # Menu tambah node
-            menu, act_dial, set_var_menu, act_reroute = self._get_context_menu(pos)
-            selected_action = menu.exec(event.globalPos())
-            
-            if selected_action == act_dial:
-                self.spawn_node(DialogueNode(), pos)
-            elif selected_action and selected_action.parent() == set_var_menu:
-                var_name = selected_action.data()
-                node = SetVarNode()
-                self.spawn_node(node, pos)
-                node.set_property(["Variable"], var_name) # Otomatis set variabelnya
-            elif selected_action == act_reroute:
-                reroute = RerouteNode()
-                self.spawn_node(reroute, pos)
+            elif selected_menu == act_del:
+                self._delete_selected_nodes()
+
+            return
+
+        self._show_context_menu(
+            event.globalPos(),
+            pos,
+            item=item,
+            mode="view"
+        )
         
         # Refresh Properties Panel
         sel_items = self.scene().selectedItems()
@@ -297,40 +316,14 @@ class GraphView(QGraphicsView):
                 # Bersihkan panel properti jika node yang dihapus sedang ditampilkan
                 self.main_window.properties_panel.clear()
     
-    def _show_context_menu_at_drop(self, global_pos, scene_pos):
-        """Dipanggil saat kabel dilepas di area kosong"""
-        menu, act_dial, set_var_menu, act_reroute = self._get_context_menu(scene_pos)
-        
-        # Eksekusi menu secara synchronous
-        selected_action = menu.exec(global_pos)
-        
-        new_node = None
-        if selected_action == act_dial:
-            new_node = DialogueNode()
-        elif selected_action and selected_action.parent() == set_var_menu:
-            var_name = selected_action.data()
-            new_node = SetVarNode()
-            new_node.set_property(["Variable"], var_name)
-        elif selected_action == act_reroute:
+    def _show_context_menu(self, global_pos, scene_pos, item=None, mode="view"):
+        def _auto_connect_node(self, node):
             start_sock = self.scene().start_socket
-            new_node = RerouteNode(start_sock.is_exec, start_sock.data_type) if hasattr(start_sock.parent_node, 'is_reroute') else RerouteNode()
-            self.spawn_node(new_node, scene_pos)
-            
-            # Hubungkan otomatis
-            if start_sock.is_input:
-                new_node.out_socket.connect_to(start_sock)
-            else:
-                start_sock.connect_to(new_node.in_socket)
-            
-            return
+            if not start_sock:
+                return
 
-        if new_node:
-            self.spawn_node(new_node, scene_pos)
-            
-            # Logika Auto-Connect yang sudah kita buat
-            start_sock = self.scene().start_socket
-            target_sockets = new_node.inputs if not start_sock.is_input else new_node.outputs
-            
+            target_sockets = node.inputs if not start_sock.is_input else node.outputs
+
             for target_sock in target_sockets:
                 if self._is_connection_allowed(start_sock, target_sock):
                     if start_sock.is_input:
@@ -338,6 +331,73 @@ class GraphView(QGraphicsView):
                     else:
                         start_sock.connect_to(target_sock)
                     break
+
+        menu, act_dial, set_var_menu, act_reroute, act_focus, act_zoom_in, act_zoom_out, act_select_all = self._get_context_menu(mode)
+
+        selected_action = menu.exec(global_pos)
+
+        # === VIEW MODE (klik kanan kosong) ===
+        if mode == "view":
+            # === NODE CREATION ACTIONS ===
+            if selected_action == act_dial:
+                self.spawn_node(DialogueNode(), scene_pos)
+
+            elif selected_action and selected_action.parent() == set_var_menu:
+                var_name = selected_action.data()
+                node = SetVarNode()
+                self.spawn_node(node, scene_pos)
+                node.set_property(["Variable"], var_name)
+
+            elif selected_action == act_reroute:
+                self.spawn_node(RerouteNode(), scene_pos)
+            
+            # === VIEW ACTIONS ===
+            elif selected_action == act_focus:
+                self.resetTransform()
+                self.zoom_level = 0
+                self.centerOn(scene_pos)
+
+            elif selected_action == act_zoom_in:
+                self.zoom_in()
+
+            elif selected_action == act_zoom_out:
+                self.zoom_out()
+
+            # === SELECTION ===
+            elif selected_action == act_select_all:
+                for item in self.scene().items():
+                    if isinstance(item, BaseNode):
+                        item.setSelected(True)
+
+        # === EDGE DROP MODE ===
+        elif mode == "edge_drop":
+            start_sock = self.scene().start_socket
+            new_node = None
+
+            # === NODE CREATION ACTIONS ===
+            if selected_action == act_dial:
+                new_node = DialogueNode()
+
+            elif selected_action and selected_action.parent() == set_var_menu:
+                var_name = selected_action.data()
+                new_node = SetVarNode()
+                new_node.set_property(["Variable"], var_name)
+
+            elif selected_action == act_reroute:
+                start_sock = self.scene().start_socket
+                new_node = RerouteNode()
+                new_node = self.spawn_node(new_node, scene_pos)
+
+                if start_sock:
+                    if start_sock.is_input:
+                        new_node.out_socket.connect_to(start_sock)
+                    else:
+                        start_sock.connect_to(new_node.in_socket)
+                return
+
+            if new_node:
+                new_node = self.spawn_node(new_node, scene_pos)
+                _auto_connect_node(self, new_node)
     
     def _is_connection_allowed(self, out_sock, in_sock):
         # Dasar: Harus beda (Input vs Output) dan Beda Node
@@ -352,15 +412,28 @@ class GraphView(QGraphicsView):
             
         return True
     
-    def _get_context_menu(self, scene_pos):
+    def _get_context_menu(self, mode="view"):
+        def _AddActionTitle(menu: QMenu, title: str):
+            title_action = QAction(title, self)
+            font = title_action.font()
+            font.setBold(True)
+            title_action.setFont(font)
+            title_action.setEnabled(False)
+            menu.addAction(title_action)
+            menu.addSeparator()
+            return title_action
+
         """Helper untuk membangun menu klik kanan yang dinamis"""
         menu = QMenu()
+
+        # === ADD NODE ===
+        _AddActionTitle(menu, "Add Node")
         
         # 1. Menu Dialogue
-        act_dial = menu.addAction("Add Dialogue Node")
+        act_dial = menu.addAction("Dialogue Node")
         
         # 2. Menu Set Variable (dengan Sub-menu)
-        set_var_menu = menu.addMenu("Add Set Variable")
+        set_var_menu = menu.addMenu("Set Variable")
         variables = self.main_window.var_manager.get_all_global_variables()
         
         if not variables:
@@ -375,9 +448,38 @@ class GraphView(QGraphicsView):
         
         # 3. Menu Reroute
         menu.addSeparator()
-        act_reroute = menu.addAction("Add Reroute")
+        act_reroute = menu.addAction("Reroute")
+
+        # === VIEW ===
+        _AddActionTitle(menu, "View").setVisible(mode=="view") # Hanya tampilkan di mode view
+
+        # 1. Focus (Center at cursor position and reset zoom)
+        act_focus = menu.addAction("Focus Here")
+        act_focus.setVisible(mode=="view")
+        # 2. Zoom In
+        act_zoom_in = menu.addAction("Zoom In")
+        act_zoom_in.setVisible(mode=="view")
+        # 3. Zoom Out
+        act_zoom_out = menu.addAction("Zoom Out")
+        act_zoom_out.setVisible(mode=="view")
+
+        # === SELECTION ===
+        _AddActionTitle(menu, "Selection").setVisible(mode=="view") # Hanya tampilkan di mode view
+
+        # 1. Select All
+        act_select_all = menu.addAction("Select All")
+        act_select_all.setVisible(mode=="view")
         
-        return menu, act_dial, set_var_menu, act_reroute
+        return (
+            menu,
+            act_dial,
+            set_var_menu,
+            act_reroute,
+            act_focus,
+            act_zoom_in,
+            act_zoom_out,
+            act_select_all
+        )
     
     def spawn_node(self, node, pos):
         """Helper untuk menaruh node di scene dan menampilkannya"""

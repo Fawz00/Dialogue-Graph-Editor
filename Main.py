@@ -13,7 +13,9 @@ from Core.EventSystem.Event import Event
 from Core.EventSystem.EventBus import EventBus
 from Core.EventSystem.EventType import EventType
 
+from Core.UIPanel.FunctionsPanel import FunctionsPanel
 from Core.UIPanel.LogPanel import LogPanel
+from Core.UIPanel.StructVariablePanel import StructVariablePanel
 from Core.VariableManager import VariableManager
 from Core.Graph.BaseNode import BaseNode
 
@@ -57,11 +59,11 @@ class MainWindow(QMainWindow):
         self.view = GraphView(self.scene, self)
         self.setCentralWidget(self.view)
 
-        # Panels
-        self.setup_docks()
-
         # Setup Toolbar
         self.setup_toolbar()
+
+        # Panels
+        self.setup_docks()
 
         # Setup Menu Bar
         self.setup_menu()
@@ -80,7 +82,22 @@ class MainWindow(QMainWindow):
         
         self.var_panel = GlobalVariablePanel(self)
         self.dock_vars.setWidget(self.var_panel)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_vars)
+
+        # --- Structures Dock (Left) ---
+        self.dock_structs = QDockWidget("Structures", self)
+        self.dock_structs.setObjectName("StructuresDock")
+        self.dock_structs.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
+
+        self.struct_panel = StructVariablePanel(self)
+        self.dock_structs.setWidget(self.struct_panel)
+
+        # --- Functions Dock (Left) ---
+        self.dock_funcs = QDockWidget("Functions", self)
+        self.dock_funcs.setObjectName("FunctionsDock")
+        self.dock_funcs.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
+
+        self.func_panel = FunctionsPanel(self)
+        self.dock_funcs.setWidget(self.func_panel)
 
         # --- Properties Dock (Right) ---
         self.dock_props = QDockWidget("Inspector", self)
@@ -89,7 +106,6 @@ class MainWindow(QMainWindow):
         
         self.properties_panel = PropertiesPanel(self)
         self.dock_props.setWidget(self.properties_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
 
         # --- Log Dock (Bottom) ---
         self.log_dock = QDockWidget("Log", self)
@@ -97,8 +113,10 @@ class MainWindow(QMainWindow):
         
         self.log_panel = LogPanel(self)
         self.log_dock.setWidget(self.log_panel)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
-    
+
+        # --- Set View ---
+        self.view_reset_layout(None) # Atur posisi dan visibilitas dock sesuai layout awal
+
         # --- Register event ---
         self.var_panel.variable_selected.connect(self.properties_panel.load_variable)        
     
@@ -204,6 +222,8 @@ class MainWindow(QMainWindow):
         # Method ini otomatis membuat Action yang 'Checkable'.
         # Jika dock tertutup, menu ini jadi unchecked. Jika diklik, dock terbuka kembali.
         window_menu.addAction(self.dock_vars.toggleViewAction())
+        window_menu.addAction(self.dock_structs.toggleViewAction())
+        window_menu.addAction(self.dock_funcs.toggleViewAction())
         window_menu.addAction(self.dock_props.toggleViewAction())
         window_menu.addAction(self.log_dock.toggleViewAction())
         window_menu.addAction(self.toolbar.toggleViewAction())
@@ -238,18 +258,27 @@ class MainWindow(QMainWindow):
     def view_reset_layout(self, menu: QMenuBar):
         # 1. Pastikan dock terlihat (mungkin user me-close nya)
         self.dock_vars.setVisible(True)
+        self.dock_structs.setVisible(True)
+        self.dock_funcs.setVisible(True)
         self.dock_props.setVisible(True)
         self.log_dock.setVisible(True)
         self.toolbar.setVisible(True)
         
         # 2. Kembalikan ke posisi awal (Floating false, area specific)
         self.dock_vars.setFloating(False)
+        self.dock_structs.setFloating(False)
+        self.dock_funcs.setFloating(False)
         self.dock_props.setFloating(False)
         self.log_dock.setFloating(False)
         
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_vars)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_structs)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_funcs)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_props)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
+
+        self.tabifyDockWidget(self.dock_structs, self.dock_funcs)
+        
         self.toolbar.toggleViewAction().setChecked(True)
         
         # Opsional: Reset ukuran window utama jika mau
@@ -286,8 +315,8 @@ class MainWindow(QMainWindow):
         print("Menu: Export clicked") # Placeholder
         
     def help_about(self):
-        QMessageBox.about(self, f"About Dialogue Editor", 
-                          f"Python Dialogue Graph Editor v{'.'.join(map(str, APP_VERSION))}\n\n"
+        QMessageBox.about(self, f"About Visual Graph Editor", 
+                          f"Python Visual Graph Editor v{'.'.join(map(str, APP_VERSION))}\n\n"
                           "Inspired by Unreal Engine Blueprints.\n"
                           "Created with PyQt6.")
     
@@ -300,6 +329,12 @@ class MainWindow(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             QApplication.quit()
+
+    def closeEvent(self, event):
+        if self.quit_application():
+            event.accept()
+        else:
+            event.ignore()
 
     #endregion Action Handlers
 
@@ -357,7 +392,7 @@ class MainWindow(QMainWindow):
 # ===== Entry Point =====
 
 APP_VERSION = [0, 0, 1]
-APP_NAME = "Dialogue Graph Editor"
+APP_NAME = "Visual Graph Editor"
 
 if __name__ == '__main__':
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseSoftwareOpenGL, True)

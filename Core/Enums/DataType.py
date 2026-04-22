@@ -5,7 +5,7 @@ class DataType(Enum):
     INT = "integer"
     FLOAT = "float"
     BOOL = "boolean"
-    ENUM = "enummeration"
+    ENUM = "enumeration"
     STRUCT = "structure"
     ARRAY = "array"
     LIST = "list"

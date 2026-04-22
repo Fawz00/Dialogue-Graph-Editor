@@ -12,10 +12,10 @@ STYLES = {
     'node_header': QColor(40, 40, 40, 200),
     'node_body': QColor(15, 15, 15, 200),
     'node_shadow': QColor(255, 255, 255),
-    'node_sel_border': QColor(255, 165, 0), # Orange selection
-    'invalid_node_border': QColor(255, 0, 0), # Red border for invalid nodes
+    'node_sel_border': QColor(255, 165, 0),     # Orange selection
+    'invalid_node_border': QColor(255, 0, 0),   # Red border for invalid nodes
     'text_color': QColor(220, 220, 220),
-    'socket_exec': QColor(255, 255, 255), # Putih untuk flow eksekusi
+    'socket_exec': QColor(255, 255, 255),       # Putih untuk flow eksekusi
 
     # Common UI colors
     'primary_text': QColor(230, 230, 230),
@@ -26,18 +26,18 @@ STYLES = {
 }
 
 DATA_TYPE_COLORS = {
-    DataType.STRING: QColor(255, 0, 212),    # Merah Muda/Magenta
-    DataType.INT: QColor(43, 226, 172),      # Teal/Hijau Toska
-    DataType.FLOAT: QColor(155, 255, 0),     # Hijau Neon
-    DataType.BOOL: QColor(172, 64, 0),       # Merah
-    DataType.ENUM: QColor(0, 100, 255),      # Biru Tua
-    DataType.ARRAY: QColor(255, 165, 0),     # Oranye
-    DataType.LIST: QColor(255, 200, 0),      # Kuning
-    DataType.STRUCT: QColor(200, 0, 255),    # Ungu
+    DataType.STRING: QColor(255, 0, 212),       # Merah Muda/Magenta
+    DataType.INT: QColor(43, 226, 172),         # Teal/Hijau Toska
+    DataType.FLOAT: QColor(155, 255, 0),        # Hijau Neon
+    DataType.BOOL: QColor(172, 64, 0),          # Merah
+    DataType.ENUM: QColor(0, 100, 255),         # Biru Tua
+    DataType.ARRAY: QColor(255, 165, 0),        # Oranye
+    DataType.LIST: QColor(255, 200, 0),         # Kuning
+    DataType.STRUCT: QColor(200, 0, 255),       # Ungu
 }
 
 LOG_LEVEL_COLORS = {
-    'info': QColor(200, 200, 200),      # Abu-abu
-    'warning': QColor(255, 200, 100),   # Kuning
-    'error': QColor(255, 100, 100),     # Merah
+    'info': QColor(200, 200, 200),              # Abu-abu
+    'warning': QColor(255, 200, 100),           # Kuning
+    'error': QColor(255, 100, 100),             # Merah
 }

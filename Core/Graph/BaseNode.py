@@ -237,7 +237,12 @@ class BaseNode(QGraphicsItem):
             if not visible:
                 continue
 
-            index = self.inputs.index(sock)
+            try:
+                index = self.inputs.index(sock)
+            except ValueError:
+                # Socket might already be removed/deleted from inputs
+                inline.set_visible(False)
+                continue
             y = 45 + index * self.socket_spacing - 12
             x = 18  # kanan socket
 
