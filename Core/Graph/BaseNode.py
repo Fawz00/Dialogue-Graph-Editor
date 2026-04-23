@@ -185,6 +185,41 @@ class BaseNode(QGraphicsItem):
             
         self.update() # Redraw
     
+    def assign_var_socket(
+        self,
+        var_name: str,
+        socket_ref,
+        is_input: bool,
+        label_prefix: str = "Value"
+    ):
+        """Assign atau update satu socket berdasarkan variabel"""
+        
+        var_info = self.var_manager.get_global_variable(var_name)
+
+        if not var_info:
+            # Hapus socket kalau variabel invalid
+            if socket_ref:
+                return self.remove_socket(socket_ref)
+            return None
+
+        v_type = DataType(var_info.type)
+        label = f"{label_prefix} ({v_type.value})"
+
+        if socket_ref is None:
+            return self.add_socket(
+                is_input,
+                is_exec=False,
+                data_type=v_type,
+                label=label
+            )
+        else:
+            return self.change_socket(
+                socket_ref,
+                is_exec=False,
+                data_type=v_type,
+                label=label
+            )
+    
     #endregion Socket Management
 
     def add_inline_input(self, socket, prop_var_name: str):
@@ -226,10 +261,10 @@ class BaseNode(QGraphicsItem):
         self.prepareGeometryChange()
         self.width = int(self.content_width + extra_width + 20)
         self._update_socket_positions()
-        self.update_inline_positions()
+        self._update_inline_positions()
         self.update()
     
-    def update_inline_positions(self):
+    def _update_inline_positions(self):
         for sock, inline in self.inline_inputs.items():
             visible = sock.is_input and len(sock.edges) == 0
             inline.set_visible(visible)

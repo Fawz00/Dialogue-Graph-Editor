@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphic
                              QMenu, QTreeWidget, QTreeWidgetItem, QMessageBox, QToolBar, QMenuBar, QStatusBar,
                              QSizePolicy)
 from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence, QIcon
+from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence, QIcon, QUndoStack
 
 from Core.Debug import Debug
 from Core.EventSystem.Event import Event
@@ -40,6 +40,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.resize(1000, 700)
         self.setStyleSheet("QMainWindow { background-color: #222; color: #EEE; }")
+
+        # Undo Stack
+        self.undo_stack = QUndoStack(self)
 
         # Editor EventBus
         self.event_bus = EventBus()
@@ -189,11 +192,11 @@ class MainWindow(QMainWindow):
         edit_menu = self.menu_bar.addMenu("&Edit")
 
         # Actions (Placeholder)
-        act_undo = QAction("Undo", self)
+        act_undo = self.undo_stack.createUndoAction(self, "Undo")
         act_undo.setShortcut(QKeySequence.StandardKey.Undo)
         edit_menu.addAction(act_undo)
 
-        act_redo = QAction("Redo", self)
+        act_redo = self.undo_stack.createRedoAction(self, "Redo")
         act_redo.setShortcut(QKeySequence.StandardKey.Redo)
         edit_menu.addAction(act_redo)
 
@@ -313,7 +316,7 @@ class MainWindow(QMainWindow):
 
     def file_export(self):
         print("Menu: Export clicked") # Placeholder
-        
+
     def help_about(self):
         QMessageBox.about(self, f"About Visual Graph Editor", 
                           f"Python Visual Graph Editor v{'.'.join(map(str, APP_VERSION))}\n\n"
