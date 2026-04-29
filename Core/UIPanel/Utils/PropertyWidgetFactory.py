@@ -95,7 +95,7 @@ class PropertyWidgetFactory:
         elif data_type == DataType.ARRAY:
             section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
-            element_type = config.element_type or DataType.STRING.value
+            element_type = config.element_type or DataType.STRING
             current_value = cast(list, current_value)
 
             for idx, item_value in enumerate(current_value):

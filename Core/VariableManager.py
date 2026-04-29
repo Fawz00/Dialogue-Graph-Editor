@@ -288,7 +288,7 @@ class VariableManager(QObject):
         # =========================
         # CHANGE TYPE
         # =========================
-        if new_data.type is not None:
+        if new_data.type is not None and new_data.type != target_meta.type:
             target_meta.type = new_data.type
 
             # Bersihkan metadata lama
@@ -296,11 +296,11 @@ class VariableManager(QObject):
             target_meta.element_type = None
 
             # Inisialisasi metadata sesuai tipe
-            if new_data.type == DataType.ENUM.value:
+            if new_data.type == DataType.ENUM:
                 target_meta.options = []
-            elif new_data.type == DataType.ARRAY.value:
-                target_meta.element_type = DataType.STRING.value
-            elif new_data.type == DataType.STRUCT.value:
+            elif new_data.type == DataType.ARRAY:
+                target_meta.element_type = DataType.STRING
+            elif new_data.type == DataType.STRUCT:
                 pass  # STRUCT hanya butuh value dict
 
             # Value selalu reset dari sumber kebenaran
@@ -367,9 +367,24 @@ class VariableManager(QObject):
             return
         else:
             var.value = VariableManager.get_default_value(var.type)
+    
+    @staticmethod
+    def try_to_assign_value(var: Variable, new_value) -> bool:
+        """Mencoba mengonversi dan menetapkan nilai baru ke variabel. Mengembalikan True jika berhasil."""
+        try:
+            converted_value = VariableManager.convert_variable_to_type(Variable(value=new_value, type=var.type), var.type)
+            if VariableManager.is_value_valid(Variable(value=converted_value, type=var.type), var.type):
+                var.value = converted_value
+                return True
+            else:
+                Debug.log_warning(f"Value '{new_value}' is not valid for type {var.type}.")
+                return False
+        except Exception as e:
+            Debug.log_error(f"Error converting value '{new_value}' to type {var.type}: {e}")
+            return False
 
     @staticmethod
-    def convert_variable_to_type(var: Variable, dtype: str | DataType):
+    def convert_variable_to_type(var: Variable, dtype: DataType):
         """
         Mengonversi nilai ke tipe data tertentu.
         Mengembalikan nilai yang dikonversi atau None jika gagal.
@@ -377,7 +392,7 @@ class VariableManager(QObject):
         if var is None:
             Debug.log_error("Cannot convert variable: Variable is None.")
             return
-
+    
         try:
             # ===============================
             # NORMALISASI TYPE
@@ -386,8 +401,12 @@ class VariableManager(QObject):
                 dtype = DataType(dtype)
             
             if var.type != dtype:
-                var.type = dtype.value
-
+                var.type = dtype
+            
+            if var.value is None:
+                var.value = VariableManager.get_default_value(dtype)
+                return
+        
             # ===============================
             # PRIMITIVE TYPES
             # ===============================

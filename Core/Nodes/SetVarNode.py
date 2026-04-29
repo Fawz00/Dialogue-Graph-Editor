@@ -1,5 +1,6 @@
 from PyQt6.QtGui import QColor
 
+from Core.Debug import Debug
 from Core.Structures.Variable import Variable
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
@@ -21,13 +22,13 @@ class SetVarNode(BaseNode):
         self.properties = {
             "Variable": Variable(
                 display_name="Variable",
-                type=DataType.ENUM.value, 
+                type=DataType.ENUM, 
                 options=list(self.var_manager.get_all_global_variables().keys()),
                 value=""
             ),
             "Value": Variable(
                 display_name="Value",
-                type=DataType.STRING.value,
+                type=DataType.STRING,
                 value=""
             )
         }
@@ -37,21 +38,33 @@ class SetVarNode(BaseNode):
 
     def set_property(self, key_path: list, value):
         super().set_property(key_path, value)
-        
+
         # Pastikan field Value berubah sesuai tipe variabel
         if key_path[0] == "Variable":
             sel_var = self.var_manager.get_global_variable(self.properties["Variable"].value)
-            val_data = Variable(
-                type=DataType(sel_var.type).value,
-                value=None,
-                options=sel_var.options,
-                element_type=sel_var.element_type
-            )
-
-            VariableManager.edit_variable(
-                database=self.properties,
-                value_path=["Value"],
-                new_data=val_data)
+            if sel_var is not None:
+                val_data = Variable(
+                    type=DataType(sel_var.type),
+                    value=None,
+                    options=sel_var.options,
+                    element_type=sel_var.element_type
+                )
+                VariableManager.edit_variable(
+                    database=self.properties,
+                    value_path=["Value"],
+                    new_data=val_data)
+                
+            else:
+                # If variable is deleted, reset Value property to default string
+                val_data = Variable(
+                    display_name="Value",
+                    type=DataType.STRING,
+                    value=""
+                )
+                VariableManager.edit_variable(
+                    database=self.properties,
+                    value_path=["Value"],
+                    new_data=val_data)
 
         self.update_sockets_by_variable(self.properties["Variable"].value)
         self.update()
@@ -61,20 +74,30 @@ class SetVarNode(BaseNode):
         self.selected_var = var_name
         var_info = self.var_manager.get_global_variable(var_name)
 
+        VariableManager.edit_variable(
+            database=self.properties,
+            value_path=["Variable"],
+            new_data=Variable(
+                type=DataType.ENUM,
+                options=list(self.var_manager.get_all_global_variables().keys()),
+                value=self.properties["Variable"].value
+            )
+        )
+
         if var_info:
             # Jika variabel valid, buat kembali socket datanya
             v_type = DataType(var_info.type)
             self.title = f"Set {var_name}"
 
             if self.in_data is None:
-                self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})")
+                self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})", prop_reference_path=["Value"])
             else:
-                self.in_data = self.change_socket(self.in_data, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})")
+                self.in_data = self.change_socket(self.in_data, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})", prop_reference_path=["Value"])
             
             if self.out_data is None:
-                self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})")
+                self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})", prop_reference_path=["Value"])
             else:
-                self.out_data = self.change_socket(self.out_data, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})")
+                self.out_data = self.change_socket(self.out_data, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})", prop_reference_path=["Value"])
             
             self.is_valid = True
 
@@ -82,7 +105,7 @@ class SetVarNode(BaseNode):
             self.out_data.update()
         else:
             # Jika variabel dihapus/tidak ada
-            self.title = "Set Variable (Select One)"
+            self.title = "Set Variable [Error]"
             self.selected_var = ""
             self.value_to_set = ""
             self.is_valid = False

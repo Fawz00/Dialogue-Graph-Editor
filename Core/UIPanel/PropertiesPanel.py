@@ -85,7 +85,7 @@ class PropertiesPanel(UIPanelBase):
             elif path[0] == "default_value":
                 new_value = value
             elif path[0] == "element_type":
-                new_other_props["element_type"] = DataType(value).value
+                new_other_props["element_type"] = DataType(value)
             
             # Validasi
             if new_name != old_name and self.var_manager.get_global_variable(new_name) is not None:
@@ -185,12 +185,12 @@ class PropertiesPanel(UIPanelBase):
         variable_serializer = {
             "var_name": Variable(
                 display_name="Name",
-                type=DataType.STRING.value,
+                type=DataType.STRING,
                 value=name
             ),
             "var_type": Variable(
                 display_name="Type",
-                type=DataType.ENUM.value,
+                type=DataType.ENUM,
                 options=VariableManager.SUPPORTED_TYPES_AS_STRING,
                 value=DataType(data.type).value
             ),
@@ -198,16 +198,16 @@ class PropertiesPanel(UIPanelBase):
             **({
                 "element_type": Variable(
                     display_name="Element Type",
-                    type=DataType.ENUM.value,
+                    type=DataType.ENUM,
                     options=VariableManager.PRIMITIVE_TYPES_AS_STRING,
-                    value=DataType(data.element_type if data.element_type is not None else DataType.STRING).value
+                    value=DataType(data.element_type if data.element_type is not None else DataType.STRING)
                 )
             } if DataType(data.type) == DataType.ARRAY else {}),
             "default_value": Variable(
                 display_name="Default Value",
-                type=DataType(data.type).value,
+                type=DataType(data.type),
                 options=data.options if data.options is not None else None,
-                element_type=DataType(data.element_type).value if data.element_type is not None else None,
+                element_type=DataType(data.element_type) if data.element_type is not None else None,
                 value=data.value
             )
         }

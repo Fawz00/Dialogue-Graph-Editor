@@ -8,9 +8,10 @@ from Core.EventSystem.EventType import EventType
 
 class Debug:
     LEVELS = {
-        'LOG': '\033[94m',      # Blue
+        'INFO': '\033[94m',      # Blue
         'WARNING': '\033[93m',  # Yellow
         'ERROR': '\033[91m',    # Red
+        'CRITICAL': '\033[95m', # Magenta
         'ENDC': '\033[0m',      # Reset
     }
 
@@ -47,12 +48,14 @@ class Debug:
         endc = Debug.LEVELS['ENDC']
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         source = Debug._get_caller_info()
+        traceback = inspect.stack()
 
         data = {
             "timestamp": timestamp,
             "level": level.value,
             "message": message,
-            "source": source
+            "source": source,
+            "traceback": traceback
         }
 
         Debug.log_data.append(data)
@@ -65,6 +68,14 @@ class Debug:
             ))
 
         print(f"{color}[{timestamp}] [{level.value}] {message} ({source}){endc}", file=sys.stderr if level == LogLevel.ERROR else sys.stdout)
+
+        if level == LogLevel.ERROR or level == LogLevel.WARNING:
+            print("Traceback (most recent call last):", file=sys.stderr)
+            for frame in traceback[1:]:  # Skip frame _log itu sendiri
+                filename = frame.filename
+                lineno = frame.lineno
+                func = frame.function
+                print(f'  File "{filename}", line {lineno}, in {func}', file=sys.stderr)
 
     @staticmethod
     def log(message):

@@ -8,7 +8,7 @@ from Core.Graph.EdgeItem import EdgeItem
 from Style import STYLES, DATA_TYPE_COLORS
 
 class SocketItem(QGraphicsItem):
-    def __init__(self, parent_node, index, is_input=True, is_exec=True, data_type: DataType = None, label=""):
+    def __init__(self, parent_node, index, is_input=True, is_exec=True, data_type: DataType = None, label="", prop_reference_path=[]):
         super().__init__(parent_node)
         self.parent_node = parent_node
         self.index = index
@@ -16,6 +16,8 @@ class SocketItem(QGraphicsItem):
         self.is_exec = is_exec
         self.data_type = data_type
         self.label = label
+        self.prop_reference_path = prop_reference_path
+
         self.collision_radius = 8
         self.radius = 6
         self.edges: list[EdgeItem] = []
@@ -68,6 +70,10 @@ class SocketItem(QGraphicsItem):
         self.is_exec = is_exec
         self.data_type = data_type if not is_exec else None
         self.label = label if label != "" else self.label
+        self.update()
+    
+    def change_var_ref(self, new_prop_path: list):
+        self.prop_reference_path = new_prop_path
         self.update()
     
     def connect_to(self, target_sock):

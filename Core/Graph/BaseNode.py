@@ -97,7 +97,7 @@ class BaseNode(QGraphicsItem):
 
         # Title Text
         painter.setPen(STYLES['text_color'])
-        painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         painter.drawText(QRectF(10, 0, self.width-20, 30), Qt.AlignmentFlag.AlignVCenter, self.title)
 
     def itemChange(self, change, value):
@@ -115,8 +115,8 @@ class BaseNode(QGraphicsItem):
 
     # region Socket Management
 
-    def add_socket(self, is_input, is_exec=True, data_type: DataType =None, label=""):
-        socket = SocketItem(self, len(self.inputs) if is_input else len(self.outputs), is_input, is_exec=is_exec, data_type=data_type, label=label)
+    def add_socket(self, is_input, is_exec=True, data_type: DataType =None, label="", prop_reference_path=[]):
+        socket = SocketItem(self, len(self.inputs) if is_input else len(self.outputs), is_input, is_exec=is_exec, data_type=data_type, label=label, prop_reference_path=prop_reference_path)
         if is_input:
             self.inputs.append(socket)
         else:
@@ -124,9 +124,10 @@ class BaseNode(QGraphicsItem):
         self._update_socket_positions()
         return socket
 
-    def change_socket(self, socket, is_exec=True, data_type=None, label=""):
+    def change_socket(self, socket, is_exec=True, data_type=None, label="", prop_reference_path=[]):
         """Mengganti properti socket tanpa menghapusnya"""
         socket.change_type(is_exec=is_exec, data_type=data_type, label=label)
+        socket.change_var_ref(prop_reference_path)
         self._update_socket_positions()
         return socket
 
@@ -184,42 +185,21 @@ class BaseNode(QGraphicsItem):
             sock.setPos(self.width, y_start + (i * self.socket_spacing))
             
         self.update() # Redraw
-    
-    def assign_var_socket(
-        self,
-        var_name: str,
-        socket_ref,
-        is_input: bool,
-        label_prefix: str = "Value"
-    ):
-        """Assign atau update satu socket berdasarkan variabel"""
+
+    def add_socket_from_var(self, prop_var_path: list):
+        # Makesure variable is valid from properties
+        var = self.properties
+        for path in prop_var_path:
+            var = var.get(path)
+
+        if not var or not isinstance(var, Variable):
+            Debug.log_error(f"Variable not found for path: {prop_var_path}")
+            return
         
-        var_info = self.var_manager.get_global_variable(var_name)
+        return self.add_socket(is_input=True, is_exec=False, data_type=DataType(var.type), label=f"{prop_var_path[-1]}", prop_reference_path=prop_var_path)
 
-        if not var_info:
-            # Hapus socket kalau variabel invalid
-            if socket_ref:
-                return self.remove_socket(socket_ref)
-            return None
 
-        v_type = DataType(var_info.type)
-        label = f"{label_prefix} ({v_type.value})"
 
-        if socket_ref is None:
-            return self.add_socket(
-                is_input,
-                is_exec=False,
-                data_type=v_type,
-                label=label
-            )
-        else:
-            return self.change_socket(
-                socket_ref,
-                is_exec=False,
-                data_type=v_type,
-                label=label
-            )
-    
     #endregion Socket Management
 
     def add_inline_input(self, socket, prop_var_name: str):
