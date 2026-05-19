@@ -21,18 +21,19 @@ class BaseNode(QGraphicsItem):
         self.title = title
         self.is_removable = True
         self.is_valid = True
-        self.properties = {}
+        self.properties = dict[str, Variable]() # key: property name, value: Variable instance
         self.content_width = 120
         self.width = 150
         self.height = 80
         self.socket_spacing = 25 # default: 25, 40 better for inline
 
-        # Sockets
-        self.inputs: list[SocketItem] = []
-        self.outputs: list[SocketItem] = []
+        # Exec Sockets
+        self.exec_inputs: list[SocketItem] = []
+        self.exec_outputs: list[SocketItem] = []
 
-        # Inline Inputs and Proxy Widgets
-        self.inline_inputs = {}
+        # Data Sockets
+        self.data_inputs: list[SocketItem] = []
+        self.data_outputs: list[SocketItem] = []
 
         # Flags
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
@@ -103,7 +104,7 @@ class BaseNode(QGraphicsItem):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             # Update edges connected to this node
-            for sock in self.inputs + self.outputs:
+            for sock in self.data_inputs + self.data_outputs:
                 for edge in sock.edges:
                     edge.update_path()
         return super().itemChange(change, value)
@@ -115,48 +116,76 @@ class BaseNode(QGraphicsItem):
     # ========== Node Methods ==========
     # region Socket Management
 
-    def add_socket(self, is_input, is_exec=True, data_type: DataType =None, label="", prop_reference_path=[]):
-        socket = SocketItem(self, len(self.inputs) if is_input else len(self.outputs), is_input, is_exec=is_exec, data_type=data_type, label=label, prop_reference_path=prop_reference_path)
+    def add_exec_socket(self, is_input, label=""):
+        socket = SocketItem(self, len(self.exec_inputs) if is_input else len(self.exec_outputs), is_input, is_exec=True, data_type=None, label=label, prop_reference_path=[])
         if is_input:
-            self.inputs.append(socket)
+            self.exec_inputs.append(socket)
         else:
-            self.outputs.append(socket)
+            self.exec_outputs.append(socket)
+        self._update_socket_positions()
+        return socket
+    
+    def add_data_socket(self, is_input, data_type: DataType =None, label="", prop_reference_path=[]):
+        socket = SocketItem(self, len(self.data_inputs) if is_input else len(self.data_outputs), is_input, is_exec=False, data_type=data_type, label=label, prop_reference_path=prop_reference_path)
+        if is_input:
+            self.data_inputs.append(socket)
+        else:
+            self.data_outputs.append(socket)
         self._update_socket_positions()
         return socket
 
-    def change_socket(self, socket, is_exec=True, data_type=None, label="", prop_reference_path=[]):
+    def change_data_socket(self, socket: SocketItem, data_type=None, label="", prop_reference_path=[]):
         """Mengganti properti socket tanpa menghapusnya"""
-        socket.change_type(is_exec=is_exec, data_type=data_type, label=label)
+        if socket not in self.data_inputs and socket not in self.data_outputs:
+            Debug.log_error("Socket not found in this node.")
+            return
+
+        socket.change_type(is_exec=False, data_type=data_type, label=label)
         socket.change_var_ref(prop_reference_path)
+        self._update_socket_positions()
+        return socket
+    
+    def change_exec_socket(self, socket: SocketItem, label=""):
+        """Mengganti properti socket tanpa menghapusnya"""
+        if socket not in self.exec_inputs and socket not in self.exec_outputs:
+            Debug.log_error("Socket not found in this node.")
+            return
+
+        socket.change_type(is_exec=True, data_type=None, label=label)
         self._update_socket_positions()
         return socket
 
     def remove_socket(self, socket):
         """Menghapus socket secara bersih dari list dan scene"""
-        if socket in self.inputs:
-            self.inputs.remove(socket)
-        if socket in self.outputs:
-            self.outputs.remove(socket)
-        if socket in self.inline_inputs:
-            self.inline_inputs[socket].destroy()
-            del self.inline_inputs[socket]
+        if socket in self.data_inputs:
+            self.data_inputs.remove(socket)
+        if socket in self.data_outputs:
+            self.data_outputs.remove(socket)
         socket.destroy()
         
         self._update_socket_positions()
     
-    def clear_sockets(self):
+    def clear_data_sockets(self):
         """Menghapus semua socket dari node"""
-        for sock in self.inputs + self.outputs:
+        for sock in self.data_inputs + self.data_outputs:
             sock.destroy()
         
-        self.inputs = []
-        self.outputs = []
+        self.data_inputs = []
+        self.data_outputs = []
+        self._update_socket_positions()
+    
+    def clear_exec_sockets(self):
+        """Menghapus semua socket dari node"""
+        for sock in self.exec_inputs + self.exec_outputs:
+            sock.destroy()
+        
+        self.exec_inputs = []
+        self.exec_outputs = []
         self._update_socket_positions()
     
     def validate_socket_connections(self):
         """Memutus kabel jika tipe data socket berubah dan tidak cocok dengan kabelnya"""
-        for socket in self.inputs + self.outputs:
-            socket = cast(SocketItem, socket)
+        for socket in self.data_inputs + self.data_outputs + self.exec_inputs + self.exec_outputs:
             if socket.is_exec:
                 continue # Lewati alur eksekusi
             
@@ -171,39 +200,42 @@ class BaseNode(QGraphicsItem):
 
     def _update_socket_positions(self):
         # Hitung tinggi node berdasarkan jumlah socket
-        count_in = len(self.inputs)
-        count_out = len(self.outputs)
+        count_in = len(self.data_inputs) + len(self.exec_inputs)
+        count_out = len(self.data_outputs) + len(self.exec_outputs)
         max_sockets = max(count_in, count_out)
         
         self.height = max(self.height, 40 + (max_sockets * self.socket_spacing))
         
         y_start = 45
-        for i, sock in enumerate(self.inputs):
+        for i, sock in enumerate(self.data_inputs):
             sock.setPos(0, y_start + (i * self.socket_spacing))
+        for i, sock in enumerate(self.exec_inputs):
+            sock.setPos(0, y_start + ((len(self.data_inputs) + i) * self.socket_spacing))
             
-        for i, sock in enumerate(self.outputs):
+        for i, sock in enumerate(self.data_outputs):
             sock.setPos(self.width, y_start + (i * self.socket_spacing))
+        for i, sock in enumerate(self.exec_outputs):
+            sock.setPos(self.width, y_start + ((len(self.data_outputs) + i) * self.socket_spacing))
             
         self.update() # Redraw
 
-    def add_socket_from_var(self, prop_var_path: list):
-        # Makesure variable is valid from properties
-        var = self.properties
-        for path in prop_var_path:
-            var = var.get(path)
-
-        if not var or not isinstance(var, Variable):
-            Debug.log_error(f"Variable not found for path: {prop_var_path}")
-            return
-        
-        return self.add_socket(is_input=True, is_exec=False, data_type=DataType(var.type), label=f"{prop_var_path[-1]}", prop_reference_path=prop_var_path)
-
     #endregion Socket Management
 
-    def add_inline_input(self, socket, prop_var_name: str):
-        prop_var = self.properties.get(prop_var_name)
+    def add_inline_input(self, socket: SocketItem, prop_reference_path: list[str]):
+        prop_var = None
+        for prop_name in prop_reference_path:
+            if prop_var is None:
+                prop_var = self.properties.get(prop_name)
+            else:
+                # Jika properti sebelumnya adalah Variable yang berisi dict, lanjutkan ke level berikutnya
+                if isinstance(prop_var.value, dict):
+                    prop_var = prop_var.value.get(prop_name)
+                else:
+                    Debug.log_error(f"Property path '{prop_reference_path}' is invalid at '{prop_name}'")
+                    return
+
         if not prop_var:
-            Debug.log_error(f"Property '{prop_var_name}' not found")
+            Debug.log_error(f"Property '{prop_reference_path}' not found")
             return
 
         container = QWidget()
@@ -212,10 +244,10 @@ class BaseNode(QGraphicsItem):
 
         editor = PropertyWidgetFactory.create(
             layout,
-            prop_var_name,
+            prop_reference_path[-1],
             prop_var,
-            lambda v, k=[prop_var_name]: self.set_property(v, k),
-            [prop_var_name]
+            lambda v, k=prop_reference_path: self.set_property(v, k),
+            prop_reference_path
         )
 
         editor.setMinimumWidth(60)
@@ -224,46 +256,19 @@ class BaseNode(QGraphicsItem):
             "background:#111; color:white; border:1px solid #444;"
         )
 
-        inline = InlineInput(self, socket, container)
-        self.inline_inputs[socket] = inline
+        self.change_data_socket(socket, data_type=prop_var.type, label=prop_reference_path[-1], prop_reference_path=prop_reference_path)
 
         self._recalculate_layout()
     
     def _recalculate_layout(self):
-        extra_width = 0
-
-        for sock, inline in self.inline_inputs.items():
-            if sock.is_input and len(sock.edges) == 0:
-                extra_width = max(extra_width, inline.size().width())
-
-        self.prepareGeometryChange()
-        self.width = int(self.content_width + extra_width + 20)
+        # self.prepareGeometryChange()
         self._update_socket_positions()
-        self._update_inline_positions()
         self.update()
-    
-    def _update_inline_positions(self):
-        for sock, inline in self.inline_inputs.items():
-            visible = sock.is_input and len(sock.edges) == 0
-            inline.set_visible(visible)
-
-            if not visible:
-                continue
-
-            try:
-                index = self.inputs.index(sock)
-            except ValueError:
-                # Socket might already be removed/deleted from inputs
-                inline.set_visible(False)
-                continue
-            y = 45 + index * self.socket_spacing - 12
-            x = 18  # kanan socket
-
-            inline.proxy.setPos(x, y)
     
     def destroy(self):
         # Hapus semua socket
-        self.clear_sockets()
+        self.clear_data_sockets()
+        self.clear_exec_sockets()
         # Hapus node dari scene
         if self.scene() is not None:
             self.scene().removeItem(self)
@@ -298,9 +303,13 @@ class BaseNode(QGraphicsItem):
             "pos": (self.pos().x(), self.pos().y()),
             "node_type": self.__class__.__name__,
             "properties": self.properties,
-            "sockets": {
-                "inputs": [sock.serialize() for sock in self.inputs],
-                "outputs": [sock.serialize() for sock in self.outputs]
+            "data_sockets": {
+                "inputs": [sock.serialize() for sock in self.data_inputs],
+                "outputs": [sock.serialize() for sock in self.data_outputs]
+            },
+            "exec_sockets": {
+                "inputs": [sock.serialize() for sock in self.exec_inputs],
+                "outputs": [sock.serialize() for sock in self.exec_outputs]
             }
         }
 

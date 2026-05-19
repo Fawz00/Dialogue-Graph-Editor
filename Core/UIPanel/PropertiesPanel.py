@@ -200,7 +200,7 @@ class PropertiesPanel(UIPanelBase):
                     display_name="Element Type",
                     type=DataType.ENUM,
                     options=VariableManager.PRIMITIVE_TYPES_AS_STRING,
-                    value=DataType(data.element_type if data.element_type is not None else DataType.STRING)
+                    value=DataType(data.element_type if data.element_type is not None else DataType.STRING).value
                 )
             } if DataType(data.type) == DataType.ARRAY else {}),
             "default_value": Variable(

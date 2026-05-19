@@ -13,6 +13,7 @@ from Core.EventSystem.Event import Event
 from Core.EventSystem.EventBus import EventBus
 from Core.EventSystem.EventType import EventType
 
+from Core.Execution.NodeRunner import NodeRunner
 from Core.UIPanel.FunctionsPanel import FunctionsPanel
 from Core.UIPanel.LogPanel import LogPanel
 from Core.UIPanel.StructVariablePanel import StructVariablePanel
@@ -56,6 +57,14 @@ class MainWindow(QMainWindow):
         # Connect signal untuk update node jika variabel diubah
         self.event_bus.subscribe(EventType.EVENT_VARIABLE_UPDATED.value, self.on_variable_updated)
         self.event_bus.subscribe(EventType.EVENT_VARIABLE_REMOVED.value, self.on_variable_deleted)
+
+        self.event_bus.subscribe(EventType.EVENT_EXECUTION_STARTED.value, self.on_execution_start)
+        self.event_bus.subscribe(EventType.EVENT_EXECUTION_PAUSED.value, self.on_execution_pause)
+        self.event_bus.subscribe(EventType.EVENT_EXECUTION_RESUMED.value, self.on_execution_resume)
+        self.event_bus.subscribe(EventType.EVENT_EXECUTION_STOPPED.value, self.on_execution_stop)
+
+        # Executor
+        self.node_runner = NodeRunner(self)
 
         # Center Canvas
         self.scene = GraphScene()
@@ -191,11 +200,13 @@ class MainWindow(QMainWindow):
         # === EDIT MENU ===
         edit_menu = self.menu_bar.addMenu("&Edit")
 
-        # Actions (Placeholder)
+        # Actions
+        # act_undo = QAction("Undo", self)
         act_undo = self.undo_stack.createUndoAction(self, "Undo")
         act_undo.setShortcut(QKeySequence.StandardKey.Undo)
         edit_menu.addAction(act_undo)
 
+        # act_redo = QAction("Redo", self)
         act_redo = self.undo_stack.createRedoAction(self, "Redo")
         act_redo.setShortcut(QKeySequence.StandardKey.Redo)
         edit_menu.addAction(act_redo)
@@ -288,22 +299,19 @@ class MainWindow(QMainWindow):
         # self.resize(1000, 700)
     
     def on_run_pressed(self):
-        Debug.log("Execution started.")
-        self.run_act.setEnabled(False)
-        self.pause_act.setEnabled(True)
-        self.stop_act.setEnabled(True)
-        # Panggil fungsi interpreter di sini nantinya
+        # Panggil fungsi interpreter
+        if self.node_runner.is_running and self.node_runner.is_paused:
+            self.node_runner.request_resume()
+        else:
+            self.node_runner.start_execution(self.start_node)
     
     def on_pause_pressed(self):
-        Debug.log("Execution paused.")
-        self.run_act.setEnabled(True)
-        self.pause_act.setEnabled(False)
-        self.stop_act.setEnabled(True)
+        # Panggil fungsi pause pada interpreter
+        self.node_runner.request_pause()
+
     def on_stop_pressed(self):
-        Debug.log("Execution stopped.")
-        self.run_act.setEnabled(True)
-        self.pause_act.setEnabled(False)
-        self.stop_act.setEnabled(False)
+        # Panggil fungsi stop pada interpreter
+        self.node_runner.request_stop()
 
     def file_open(self):
         print("Menu: Open clicked") # Placeholder
@@ -390,6 +398,31 @@ class MainWindow(QMainWindow):
     
     #endregion Variable Change Handlers
 
+    # ===== Handler execution flow =====
+    #region Execution Flow
+
+    def on_execution_start(self, event: Event):
+        self.run_act.setEnabled(False)
+        self.pause_act.setEnabled(True)
+        self.stop_act.setEnabled(True)
+    
+    def on_execution_pause(self, event: Event):
+        self.run_act.setEnabled(True)
+        self.pause_act.setEnabled(False)
+        self.stop_act.setEnabled(True)
+
+    def on_execution_resume(self, event: Event):
+        self.run_act.setEnabled(False)
+        self.pause_act.setEnabled(True)
+        self.stop_act.setEnabled(True)
+
+    def on_execution_stop(self, event: Event):
+        self.run_act.setEnabled(True)
+        self.pause_act.setEnabled(False)
+        self.stop_act.setEnabled(False)
+
+    #endregion Execution Flow
+
 
 
 # ===== Entry Point =====
@@ -398,7 +431,7 @@ APP_VERSION = [0, 0, 1]
 APP_NAME = "Visual Graph Editor"
 
 if __name__ == '__main__':
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseSoftwareOpenGL, True)
+    # QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseSoftwareOpenGL, True)
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeMenuBar, True)
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True)
 

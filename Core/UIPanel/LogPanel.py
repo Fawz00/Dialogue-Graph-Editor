@@ -2,11 +2,12 @@ import os
 import subprocess
 import sys
 import urllib.parse
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (QMessageBox, QTextBrowser, QToolButton, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, 
                              QPushButton, QComboBox, QTreeWidget, QTreeWidgetItem, QMenu, QTextEdit,
                              QHeaderView, QSplitter)
-from PyQt6.QtGui import QAction, QColor, QBrush, QFont
+from PyQt6.QtGui import QAction, QColor, QBrush, QFont, QGuiApplication
+from collections import deque
 
 from Core.Debug import Debug
 from Core.Enums.DataType import DataType
@@ -18,10 +19,29 @@ from Core.VariableManager import VariableManager
 from Core.UIPanel.Utils.TypeDelegate import TypeDelegate
 
 class LogPanel(UIPanelBase):
+    log_signal = pyqtSignal(object)
+
     def __init__(self, main_window):
         super().__init__(main_window)
-        main_window.event_bus.subscribe(EventType.EVENT_LOG_ADDED.value, self.on_log_added)
+        main_window.event_bus.subscribe(
+            EventType.EVENT_LOG_ADDED.value,
+            lambda event: self.log_signal.emit(event)
+        )
+        
+        # ========= LOG MANAGEMENT ==========
+        self.pending_logs = deque()
 
+        self.max_log_entries = 512
+        self.max_pending_logs = 5000
+        self.max_logs_per_flush = 250
+
+        self.flush_timer = QTimer()
+        self.flush_timer.timeout.connect(self.flush_logs)
+        self.flush_timer.start(100)
+
+        self.log_signal.connect(self.on_log_added)
+
+        # ========= UI COMPONENTS =========
         self.tree = None
         self.search_edit = None
         self.detail_panel = None
@@ -86,10 +106,24 @@ class LogPanel(UIPanelBase):
 
         # LEFT: TREE
         self.tree = QTreeWidget()
+        self.tree.setUniformRowHeights(True)
+        self.tree.setAnimated(False)
         self.tree.setColumnCount(4)
         self.tree.setHeaderLabels(["Level", "Time", "Message", "Source"])
+        # Atur lebar kolom default per section (tetap interaktif)
+        header = self.tree.header()
+        header.resizeSection(0, 80)   # Level
+        header.resizeSection(1, 150)  # Time
+        header.resizeSection(2, 400)  # Message
+        header.resizeSection(3, 150)  # Source
+
         self.tree.setHorizontalScrollMode(QTreeWidget.ScrollMode.ScrollPerPixel)
         self.tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        # MULTI SELECT & CONTEXT MENU
+        self.tree.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.show_context_menu)
         self.tree.itemClicked.connect(self.on_item_clicked)
 
         self.splitter.addWidget(self.tree)
@@ -120,12 +154,10 @@ class LogPanel(UIPanelBase):
     # ========== Event Handlers ==========
     
     def on_log_added(self, event: Event):
-        self.add_log_item(event.payload)
+        if len(self.pending_logs) >= self.max_pending_logs:
+            self.pending_logs.popleft()
 
-        self.apply_filters()
-
-        if self.auto_scroll_btn.isChecked():
-            self.tree.scrollToBottom()
+        self.pending_logs.append(event.payload)
 
     def apply_filters(self):
         text = self.search_edit.text().lower()
@@ -152,6 +184,94 @@ class LogPanel(UIPanelBase):
                         break
 
             item.setHidden(not (level_match and text_match))
+    
+    def show_context_menu(self, position):
+        menu = QMenu(self)
+
+        copy_action = QAction("Copy", self)
+        copy_action.triggered.connect(self.copy_selected_logs)
+        menu.addAction(copy_action)
+
+        deep_copy_action = QAction("Deep Copy (Full Detail)", self)
+        deep_copy_action.triggered.connect(self.deep_copy_selected_logs)
+        menu.addAction(deep_copy_action)
+
+        menu.addSeparator()
+
+        select_all_action = QAction("Select All", self)
+        select_all_action.triggered.connect(self.tree.selectAll)
+        menu.addAction(select_all_action)
+
+        select_none_action = QAction("Select None", self)
+        select_none_action.triggered.connect(self.tree.clearSelection)
+        menu.addAction(select_none_action)
+
+        menu.addSeparator()
+
+        clear_action = QAction("Clear", self)
+        clear_action.triggered.connect(self.clear_logs)
+        menu.addAction(clear_action)
+
+        # Tampilkan menu pada posisi kursor
+        menu.exec(self.tree.viewport().mapToGlobal(position))
+
+    def copy_selected_logs(self):
+        selected_items = self.tree.selectedItems()
+        if not selected_items:
+            return
+
+        copied_text = []
+        for item in selected_items:
+            # Ambil teks dari kolom (Level, Time, Message, Source)
+            level = item.text(0)
+            time = item.text(1)
+            message = item.text(2)
+            source = item.text(3)
+            
+            # Format teks yang akan disalin
+            copied_text.append(f"[{time}] {level} | {message} | {source}")
+
+        # Salin ke clipboard
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText("\n".join(copied_text))
+    
+    def deep_copy_selected_logs(self):
+        selected_items = self.tree.selectedItems()
+        if not selected_items:
+            return
+
+        copied_text = []
+        for item in selected_items:
+            # Ambil data lengkap dari UserRole
+            log_entry = item.data(0, Qt.ItemDataRole.UserRole)
+            if not log_entry:
+                continue
+
+            # Buat format teks untuk Deep Copy
+            entry_lines = []
+            entry_lines.append(f"[{log_entry.get('timestamp', '')}] {log_entry.get('level', '')}")
+            entry_lines.append(f"Source  : {log_entry.get('source', '')}")
+            entry_lines.append(f"Message : {log_entry.get('message', '')}")
+            
+            # Parsing Traceback jika ada
+            traceback_data = log_entry.get("traceback", [])
+            if traceback_data and traceback_data != "No traceback available":
+                entry_lines.append("Traceback:")
+                for frame in traceback_data:
+                    entry_lines.append(f"  File \"{frame.filename}\", line {frame.lineno}, in {frame.function}")
+                    if frame.code_context:
+                        entry_lines.append(f"    {frame.code_context[0].strip()}")
+            else:
+                entry_lines.append("Traceback: None")
+
+            # Gabungkan baris-baris pada satu log
+            copied_text.append("\n".join(entry_lines))
+
+        # Jika memilih lebih dari satu baris, pisahkan antar-log dengan garis pembatas
+        final_text = ("\n\n" + ("=" * 50) + "\n\n").join(copied_text) if len(copied_text) > 1 else copied_text[0]
+        
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText(final_text)
 
 
 
@@ -201,6 +321,11 @@ class LogPanel(UIPanelBase):
         self.apply_log_color(item, log_entry["level"])
 
         self.tree.addTopLevelItem(item)
+
+        # Hapus log lama jika sudah melebihi batas
+        if self.tree.topLevelItemCount() > self.max_log_entries:
+            old_item = self.tree.takeTopLevelItem(0)
+            del old_item
     
     def on_item_clicked(self, item, column):
         log_entry = item.data(0, Qt.ItemDataRole.UserRole)
@@ -215,7 +340,6 @@ class LogPanel(UIPanelBase):
         timestamp = log_entry.get("timestamp", "")
         source = log_entry.get("source", "")
         message = log_entry.get("message", "")
-        traceback = log_entry.get("traceback", "No traceback available")
 
         formatted = []
 
@@ -328,3 +452,23 @@ class LogPanel(UIPanelBase):
                 os.startfile(file_path)
             except Exception:
                 pass
+    
+    def flush_logs(self):
+        if not self.pending_logs:
+            return
+
+        self.tree.setUpdatesEnabled(False)
+
+        count = 0
+
+        while self.pending_logs and count < self.max_logs_per_flush:
+            log_entry = self.pending_logs.popleft()
+
+            self.add_log_item(log_entry)
+
+            count += 1
+
+        self.tree.setUpdatesEnabled(True)
+
+        if self.auto_scroll_btn.isChecked():
+            self.tree.scrollToBottom()

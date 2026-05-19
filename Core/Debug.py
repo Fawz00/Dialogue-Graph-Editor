@@ -8,12 +8,14 @@ from Core.EventSystem.EventType import EventType
 
 class Debug:
     LEVELS = {
-        'INFO': '\033[94m',      # Blue
+        'DEBUG': '\033[90m',    # Grey
+        'INFO': '\033[94m',     # Blue
         'WARNING': '\033[93m',  # Yellow
         'ERROR': '\033[91m',    # Red
         'CRITICAL': '\033[95m', # Magenta
         'ENDC': '\033[0m',      # Reset
     }
+    MAX_LOG_ENTRIES = 1048576  # Limit log entries to prevent memory bloat
 
     _main_window = None
     log_data = []
@@ -59,6 +61,10 @@ class Debug:
         }
 
         Debug.log_data.append(data)
+        
+        # Limit the number of log entries
+        if len(Debug.log_data) > Debug.MAX_LOG_ENTRIES:
+            Debug.log_data.pop(0)
 
         if Debug._main_window:
             Debug._main_window.event_bus.publish(Event(
@@ -81,9 +87,14 @@ class Debug:
     def log(message):
         Debug._log(LogLevel.INFO, message)
     @staticmethod
+    def log_debug(message):
+        Debug._log(LogLevel.DEBUG, message)
+    @staticmethod
     def log_warning(message):
         Debug._log(LogLevel.WARNING, message)
-
     @staticmethod
     def log_error(message):
         Debug._log(LogLevel.ERROR, message)
+    @staticmethod
+    def log_critical(message):
+        Debug._log(LogLevel.CRITICAL, message)

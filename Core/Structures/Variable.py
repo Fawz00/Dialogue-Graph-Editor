@@ -8,6 +8,8 @@ class Variable:
     type: DataType
     value: Any
 
+    enabled: bool = True
+
     # Optional metadata for variable
     options: Optional[List[Any]] = None     # For ENUM types
     element_type: Optional[DataType] = None      # For ARRAY types

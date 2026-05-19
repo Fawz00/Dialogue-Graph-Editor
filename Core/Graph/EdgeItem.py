@@ -7,7 +7,7 @@ from Core.Enums.DataType import DataType
 from Style import STYLES, DATA_TYPE_COLORS
 
 class EdgeItem(QGraphicsPathItem):
-    def __init__(self, start_socket, end_socket = None, cur_mouse_pos=None):
+    def __init__(self, start_socket: 'SocketItem', end_socket: 'SocketItem' = None, cur_mouse_pos=None):
         super().__init__()
         self.setZValue(-1) # Gambar di belakang node
         self.start_socket = start_socket

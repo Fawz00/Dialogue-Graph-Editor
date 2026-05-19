@@ -8,7 +8,7 @@ from Core.Graph.EdgeItem import EdgeItem
 from Style import STYLES, DATA_TYPE_COLORS
 
 class SocketItem(QGraphicsItem):
-    def __init__(self, parent_node, index, is_input=True, is_exec=True, data_type: DataType = None, label="", prop_reference_path=[]):
+    def __init__(self, parent_node, index: int, is_input=True, is_exec=True, data_type: DataType = None, label="", prop_reference_path=[]):
         super().__init__(parent_node)
         self.parent_node = parent_node
         self.index = index
@@ -20,7 +20,7 @@ class SocketItem(QGraphicsItem):
 
         self.collision_radius = 8
         self.radius = 6
-        self.edges: list[EdgeItem] = []
+        self.edges: list['EdgeItem'] = []
         self.setAcceptHoverEvents(True)
         
         # Posisi relatif terhadap node akan diatur oleh node itu sendiri

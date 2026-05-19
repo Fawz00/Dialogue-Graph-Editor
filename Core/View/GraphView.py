@@ -1,13 +1,15 @@
 import sys
-from PyQt6.QtWidgets import (QGraphicsView, QMenu, QToolButton)
+from PyQt6.QtWidgets import (QGraphicsItem, QGraphicsView, QMenu, QToolButton)
 from PyQt6.QtCore import Qt, QEvent, QSize, QPoint
 from PyQt6.QtGui import QPainter, QMouseEvent, QIcon, QContextMenuEvent, QAction
 
+from Core.Debug import Debug
 from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
 from Core.Graph.EdgeItem import EdgeItem
 from Core.Graph.SocketItem import SocketItem
 
+from Core.Nodes.PrintNode import PrintNode
 from Core.Nodes.DialogueNode import DialogueNode
 from Core.Nodes.SetVarNode import SetVarNode
 from Core.Nodes.RerouteNode import RerouteNode
@@ -228,17 +230,51 @@ class GraphView(QGraphicsView):
     
     def wheelEvent(self, event):
         """Menangani Zoom In / Zoom Out dengan Scroll Mouse"""
-        # Tentukan arah scroll
-        delta = event.angleDelta().y()
-        
-        if delta > 0: # Scroll ke atas (Zoom In)
+        angle = event.angleDelta()
+
+        # === TRACKPAD (2-finger scroll → PAN) ===
+        is_trackpad = (
+            abs(angle.y()) < 120 or 
+            abs(angle.x()) > 0 or
+            event.phase() != Qt.ScrollPhase.NoScrollPhase
+        )
+
+        if is_trackpad:
+            # PAN
+            self.horizontalScrollBar().setValue(
+                self.horizontalScrollBar().value() - angle.x()
+            )
+            self.verticalScrollBar().setValue(
+                self.verticalScrollBar().value() - angle.y()
+            )
+            return
+
+        # === MOUSE WHEEL → ZOOM ===
+        delta = angle.y()
+
+        if delta > 0:
             if self.zoom_level < self.zoom_range[1]:
                 self.scale(self.zoom_factor, self.zoom_factor)
                 self.zoom_level += 1
-        else: # Scroll ke bawah (Zoom Out)
+        else:
             if self.zoom_level > self.zoom_range[0]:
                 self.scale(1 / self.zoom_factor, 1 / self.zoom_factor)
                 self.zoom_level -= 1
+    
+    def event(self, event):
+        if event.type() == QEvent.Type.NativeGesture:
+            if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                factor = 1 + event.value()
+
+                if factor > 1 and self.zoom_level < self.zoom_range[1]:
+                    self.scale(factor, factor)
+                    self.zoom_level += 1
+                elif factor < 1 and self.zoom_level > self.zoom_range[0]:
+                    self.scale(factor, factor)
+                    self.zoom_level -= 1
+
+                return True
+        return super().event(event)
 
     #endregion Input Events
     
@@ -332,7 +368,7 @@ class GraphView(QGraphicsView):
                         start_sock.connect_to(target_sock)
                     break
 
-        menu, act_dial, set_var_menu, act_reroute, act_focus, act_zoom_in, act_zoom_out, act_select_all = self._get_context_menu(mode)
+        menu, act_dial, act_print, set_var_menu, act_reroute, act_focus, act_zoom_in, act_zoom_out, act_select_all = self._get_context_menu(mode)
 
         selected_action = menu.exec(global_pos)
 
@@ -350,7 +386,10 @@ class GraphView(QGraphicsView):
 
             elif selected_action == act_reroute:
                 self.spawn_node(RerouteNode(), scene_pos)
-            
+
+            elif selected_action == act_print:
+                self.spawn_node(PrintNode(), scene_pos)
+
             # === VIEW ACTIONS ===
             elif selected_action == act_focus:
                 self.resetTransform()
@@ -394,6 +433,9 @@ class GraphView(QGraphicsView):
                     else:
                         start_sock.connect_to(new_node.in_socket)
                 return
+            
+            elif selected_action == act_print:
+                new_node = PrintNode()
 
             if new_node:
                 new_node = self.spawn_node(new_node, scene_pos)
@@ -446,7 +488,10 @@ class GraphView(QGraphicsView):
                 # Kita simpan nama variabel di dalam data action agar bisa diambil nanti
                 action.setData(var_name)
         
-        # 3. Menu Reroute
+        # 3. Print Node
+        act_print = menu.addAction("Print")
+        
+        # 4. Menu Reroute
         menu.addSeparator()
         act_reroute = menu.addAction("Reroute")
 
@@ -473,6 +518,7 @@ class GraphView(QGraphicsView):
         return (
             menu,
             act_dial,
+            act_print,
             set_var_menu,
             act_reroute,
             act_focus,

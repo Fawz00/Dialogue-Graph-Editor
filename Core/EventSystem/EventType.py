@@ -9,3 +9,8 @@ class EventType(Enum):
     EVENT_NODE_REMOVED = "event_node_removed"
 
     EVENT_LOG_ADDED = "event_log_added"
+
+    EVENT_EXECUTION_STARTED = "event_execution_started"
+    EVENT_EXECUTION_PAUSED = "event_execution_paused"
+    EVENT_EXECUTION_RESUMED = "event_execution_resumed"
+    EVENT_EXECUTION_STOPPED = "event_execution_stopped"

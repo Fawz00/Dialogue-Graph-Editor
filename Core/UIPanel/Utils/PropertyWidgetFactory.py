@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (QLabel, QLineEdit, QComboBox, QSpinBox, QDoubleSpin
 from PyQt6.QtGui import QPalette, QColor, QIcon, QAction
 from PyQt6.QtCore import Qt, QSize
 
+from Core.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.Structures.Variable import Variable
 from Core.VariableManager import VariableManager
@@ -20,6 +21,13 @@ class PropertyWidgetFactory:
         if path is None:
             path = []
         
+        if not isinstance(config, Variable):
+            Debug.log(f"Invalid config for property '{var_name}': {config}")
+            return PropertyWidgetFactory._create_fallback_widget(config)
+        
+        if config.enabled is False:
+            return None
+
         data_type = DataType(config.type)
         current_value = config.value
 
@@ -235,11 +243,12 @@ class PropertyWidgetFactory:
         header.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         header.setIconSize(QSize(10, 10))
         header.setIcon(QIcon("resources/arrow_down.png"))
-        header.setStyleSheet("""
-            QToolButton { 
+        header.setStyleSheet(f"""
+            QToolButton {{
+                color: #{STYLES['text_color'].name()[1:]};
                 border: none;
                 font-weight: bold;
-            }
+            }}
         """)
 
         content = QWidget()
