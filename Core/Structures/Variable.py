@@ -5,7 +5,7 @@ from Core.Enums.DataType import DataType
 
 @dataclass
 class Variable:
-    type: DataType
+    type: DataType | None
     value: Any
 
     enabled: bool = True

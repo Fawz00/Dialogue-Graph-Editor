@@ -1,6 +1,7 @@
+from typing import Any
+
 from PyQt6.QtGui import QColor
 
-from Core.Debug import Debug
 from Core.Structures.Variable import Variable
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
@@ -10,7 +11,7 @@ class SetVarNode(BaseNode):
     def __init__(self):
         super().__init__("Set Variable")
         self.header_color = QColor(50, 150, 50, 200)
-        self.var_manager = self.main_window.var_manager
+        self.var_manager = self.main_window.var_manager if self.main_window else None
 
         # 1. Socket Alur (Exec)
         self.add_socket(True, True)
@@ -23,7 +24,7 @@ class SetVarNode(BaseNode):
             "Variable": Variable(
                 display_name="Variable",
                 type=DataType.ENUM, 
-                options=list(self.var_manager.get_all_global_variables().keys()),
+                options=list(self.var_manager.get_all_global_variables().keys()) if self.var_manager else [],
                 value=""
             ),
             "Value": Variable(
@@ -36,12 +37,12 @@ class SetVarNode(BaseNode):
     def get_properties(self):
         return self.properties
 
-    def set_property(self, key_path: list, value):
+    def set_property(self, key_path: list[str], value: Any):
         super().set_property(key_path, value)
 
         # Pastikan field Value berubah sesuai tipe variabel
         if key_path[0] == "Variable":
-            sel_var = self.var_manager.get_global_variable(self.properties["Variable"].value)
+            sel_var = self.var_manager.get_global_variable(self.properties["Variable"].value) if self.var_manager else None
             if sel_var is not None:
                 val_data = Variable(
                     type=DataType(sel_var.type),
@@ -69,17 +70,17 @@ class SetVarNode(BaseNode):
         self.update_sockets_by_variable(self.properties["Variable"].value)
         self.update()
 
-    def update_sockets_by_variable(self, var_name):
+    def update_sockets_by_variable(self, var_name: str):
         """Membangun ulang atau menghapus socket data berdasarkan variabel"""
         self.selected_var = var_name
-        var_info = self.var_manager.get_global_variable(var_name)
+        var_info = self.var_manager.get_global_variable(var_name) if self.var_manager else None
 
         VariableManager.edit_variable(
             database=self.properties,
             value_path=["Variable"],
             new_data=Variable(
                 type=DataType.ENUM,
-                options=list(self.var_manager.get_all_global_variables().keys()),
+                options=list(self.var_manager.get_all_global_variables().keys()) if self.var_manager else [],
                 value=self.properties["Variable"].value
             )
         )

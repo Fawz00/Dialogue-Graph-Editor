@@ -1,10 +1,17 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import inspect
 import sys
 import datetime
 
+from Core.Debug.LogData import LogData
 from Core.Enums.LogLevel import LogLevel
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType
+
+if TYPE_CHECKING:
+    from Main import MainWindow
 
 class Debug:
     LEVELS = {
@@ -17,17 +24,19 @@ class Debug:
     }
     MAX_LOG_ENTRIES = 1048576  # Limit log entries to prevent memory bloat
 
-    _main_window = None
-    log_data = []
+    _main_window: MainWindow | None = None
+    log_data: list[LogData] = []
 
     @classmethod
-    def set_main_window(cls, main_window):
+    def set_main_window(cls, main_window: MainWindow):
         cls._main_window = main_window
 
     @staticmethod
     def _get_caller_info():
         frame = inspect.currentframe()
-        # Lompat dari frame _get_caller_info ke frame sebelumnya
+        if frame is None:
+            return "Unknown Source"
+
         frame = frame.f_back
 
         while frame:
@@ -46,19 +55,19 @@ class Debug:
 
     @staticmethod
     def _log(level: LogLevel, message: str):
-        color = Debug.LEVELS.get(level, '')
+        color = Debug.LEVELS.get(level.name, '')
         endc = Debug.LEVELS['ENDC']
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         source = Debug._get_caller_info()
         traceback = inspect.stack()
 
-        data = {
-            "timestamp": timestamp,
-            "level": level.value,
-            "message": message,
-            "source": source,
-            "traceback": traceback
-        }
+        data: LogData = LogData(
+            timestamp=timestamp,
+            level=level,
+            message=message,
+            source=source,
+            traceback=traceback
+        )
 
         Debug.log_data.append(data)
         
@@ -70,7 +79,9 @@ class Debug:
             Debug._main_window.event_bus.publish(Event(
                 type=EventType.EVENT_LOG_ADDED.value,
                 source=source,
-                payload=data
+                payload={
+                    "data": data
+                }
             ))
 
         print(f"{color}[{timestamp}] [{level.value}] {message} ({source}){endc}", file=sys.stderr if level == LogLevel.ERROR else sys.stdout)
@@ -84,17 +95,17 @@ class Debug:
                 print(f'  File "{filename}", line {lineno}, in {func}', file=sys.stderr)
 
     @staticmethod
-    def log(message):
+    def log(message: str):
         Debug._log(LogLevel.INFO, message)
     @staticmethod
-    def log_debug(message):
+    def log_debug(message: str):
         Debug._log(LogLevel.DEBUG, message)
     @staticmethod
-    def log_warning(message):
+    def log_warning(message: str):
         Debug._log(LogLevel.WARNING, message)
     @staticmethod
-    def log_error(message):
+    def log_error(message: str):
         Debug._log(LogLevel.ERROR, message)
     @staticmethod
-    def log_critical(message):
+    def log_critical(message: str):
         Debug._log(LogLevel.CRITICAL, message)

@@ -1,15 +1,22 @@
-from PyQt6.QtCore import QObject, pyqtSignal
-from numpy import var
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from Core.Debug import Debug
+from typing import Any
+
+from PyQt6.QtCore import QObject
+
+from Core.Debug.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType
 from Core.Structures.Variable import Variable
 
+if TYPE_CHECKING:
+    from Main import MainWindow
+
 class VariableManager(QObject):
     # Konstanta untuk konfigurasi variabel
-    _DEFAULT_VALUES = {
+    _DEFAULT_VALUES: dict[DataType, Any] = {
         DataType.STRING: "",
         DataType.INT: 0,
         DataType.FLOAT: 0.0,
@@ -36,7 +43,7 @@ class VariableManager(QObject):
         DataType.BOOL.value
     ]
 
-    def __init__(self, main_window=None):
+    def __init__(self, main_window: MainWindow):
         super().__init__(main_window)
         self._main_window = main_window
 
@@ -91,7 +98,7 @@ class VariableManager(QObject):
     
     # === CRUD Methods ===
     
-    def delete_global_variable(self, name):
+    def delete_global_variable(self, name: str):
         success = VariableManager.delete_variable(self._global_variables, name)
 
         if success:
@@ -103,13 +110,13 @@ class VariableManager(QObject):
         
     
     @staticmethod
-    def delete_variable(database, name) -> bool:
+    def delete_variable(database: dict[str, Variable], name: str) -> bool:
         if name in database:
             del database[name]
             return True
         return False
     
-    def edit_global_variable(self, value_path: list, new_name: str = None, new_data: Variable = None):
+    def edit_global_variable(self, value_path: list[str], new_name: str | None = None, new_data: Variable | None = None):
         success = VariableManager.edit_variable(self._global_variables, value_path, new_name, new_data)
 
         if success:
@@ -123,8 +130,8 @@ class VariableManager(QObject):
             ))
     
     @staticmethod
-    def edit_variable(database, value_path: list, new_name: str = None, new_data: Variable = None) -> bool:
-        def get_nested_meta(current_meta: Variable, path: list):
+    def edit_variable(database: dict[str, Variable], value_path: list[str], new_name: str | None = None, new_data: Variable | None = None) -> bool:
+        def get_nested_meta(current_meta: Variable, path: list[str]):
             parent = None
             key = None
             meta = current_meta
@@ -178,8 +185,8 @@ class VariableManager(QObject):
             return False
 
         root_meta = database[old_var_name]
-        parent: Variable | dict | list = None
-        target_meta: Variable = None
+        parent: Variable | Any | None = None
+        target_meta: Variable | None = None
 
         if len(value_path) == 1:
             key = old_var_name
@@ -337,7 +344,7 @@ class VariableManager(QObject):
         
         return True
     
-    def get_global_variable(self, name):
+    def get_global_variable(self, name: str) -> Variable | None:
         return self._global_variables.get(name, None)
 
     def get_all_global_variables(self):
@@ -349,7 +356,7 @@ class VariableManager(QObject):
     #region Helper Methods
 
     @staticmethod
-    def get_default_value(var_type: str | DataType):
+    def get_default_value(var_type: DataType) -> Any:
         """Mengembalikan nilai default berdasarkan tipe data"""
         dt = DataType(var_type)
         result = VariableManager._DEFAULT_VALUES.get(dt, None)

@@ -1,9 +1,9 @@
 import os
 import shutil
 
-def remove_pycache(directory='.'):
+def remove_pycache(directory: str = '.'):
     """Remove all __pycache__ directories recursively."""
-    for root, dirs, files in os.walk(directory):
+    for root, dirs, _ in os.walk(directory):
         if '__pycache__' in dirs:
             pycache_path = os.path.join(root, '__pycache__')
             try:

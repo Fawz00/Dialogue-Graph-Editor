@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (QGraphicsItem, QGraphicsView, QMenu, QToolButton)
 from PyQt6.QtCore import Qt, QEvent, QSize, QPoint
 from PyQt6.QtGui import QPainter, QMouseEvent, QIcon, QContextMenuEvent, QAction
 
-from Core.Debug import Debug
+from Core.Debug.Debug import Debug
 from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
 from Core.Graph.EdgeItem import EdgeItem

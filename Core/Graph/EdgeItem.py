@@ -1,4 +1,6 @@
-import sys
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from PyQt6.QtWidgets import (QGraphicsPathItem)
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QPen, QPainterPath
@@ -6,13 +8,16 @@ from PyQt6.QtGui import QPen, QPainterPath
 from Core.Enums.DataType import DataType
 from Style import STYLES, DATA_TYPE_COLORS
 
+if TYPE_CHECKING:
+    from Core.Graph.SocketItem import SocketItem
+
 class EdgeItem(QGraphicsPathItem):
-    def __init__(self, start_socket: 'SocketItem', end_socket: 'SocketItem' = None, cur_mouse_pos=None):
+    def __init__(self, start_socket: SocketItem, end_socket: SocketItem, cur_mouse_pos: QPointF | None = None):
         super().__init__()
         self.setZValue(-1) # Gambar di belakang node
         self.start_socket = start_socket
         self.end_socket = end_socket
-        self.cur_mouse_pos = cur_mouse_pos if cur_mouse_pos else start_socket.get_scene_pos()
+        self.cur_mouse_pos: QPointF = cur_mouse_pos if cur_mouse_pos is not None else start_socket.get_scene_pos()
         self.update_path()
 
     def update_path(self):

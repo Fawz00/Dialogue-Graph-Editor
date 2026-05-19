@@ -1,9 +1,10 @@
+from typing import Any
+
 from PyQt6.QtGui import QColor
 
 from Core.Structures.Variable import Variable
 from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
-from Core.VariableManager import VariableManager
 
 class DialogueNode(BaseNode):
     def __init__(self):
@@ -12,18 +13,18 @@ class DialogueNode(BaseNode):
         self.properties = {
             "speaker": Variable(
                 display_name="Speaker",
-                type=DataType.STRING.value,
+                type=DataType.STRING,
                 value=""
             ),
             "text": Variable(
                 display_name="Dialogue Text",
-                type=DataType.STRING.value,
+                type=DataType.STRING,
                 value=""
             ),
             "choices": Variable(
                 display_name="Choices",
-                type=DataType.ARRAY.value,
-                element_type=DataType.STRING.value,
+                type=DataType.ARRAY,
+                element_type=DataType.STRING,
                 value=[""] # Mulai dengan satu pilihan kosong
             )
         }
@@ -36,7 +37,9 @@ class DialogueNode(BaseNode):
         # Hapus socket output lama (secara logika sederhana)
         # Di aplikasi real, perlu cleanup edge yang terhubung
         for s in self.outputs:
-            self.scene().removeItem(s)
+            scene = self.scene()
+            if scene is not None:
+                scene.removeItem(s)
         self.outputs.clear()
         
         # Buat socket baru berdasarkan pilihan
@@ -46,7 +49,7 @@ class DialogueNode(BaseNode):
     def get_properties(self):
         return self.properties
 
-    def set_property(self, key_path: list, value):        
+    def set_property(self, key_path: list[str], value: Any):        
         super().set_property(key_path, value)
 
         if key_path[0] == "choices":

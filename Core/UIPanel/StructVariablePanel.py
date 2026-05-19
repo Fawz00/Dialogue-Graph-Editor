@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLi
                              QPushButton, QComboBox, QTreeWidget, QTreeWidgetItem, QMenu)
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 
-from Core.Debug import Debug
+from Core.Debug.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType

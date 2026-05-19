@@ -1,14 +1,11 @@
-import sys, select, threading 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView, 
-                             QGraphicsItem, QGraphicsPathItem, QGraphicsProxyWidget,
-                             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QLayout,
-                             QPushButton, QComboBox, QDockWidget, QListWidget, QFormLayout,
-                             QMenu, QTreeWidget, QTreeWidgetItem, QMessageBox, QToolBar, QMenuBar, QStatusBar,
+import sys
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
+                             QMessageBox, QToolBar, QMenuBar,
                              QSizePolicy)
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence, QIcon, QUndoStack
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QAction, QKeySequence, QIcon, QUndoStack
 
-from Core.Debug import Debug
+from Core.Debug.Debug import Debug
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventBus import EventBus
 from Core.EventSystem.EventType import EventType
@@ -20,11 +17,7 @@ from Core.UIPanel.StructVariablePanel import StructVariablePanel
 from Core.VariableManager import VariableManager
 from Core.Graph.BaseNode import BaseNode
 
-from Core.Graph.SocketItem import SocketItem
-from Core.Graph.EdgeItem import EdgeItem
-
 from Core.Nodes.StartNode import StartNode
-from Core.Nodes.DialogueNode import DialogueNode
 from Core.Nodes.SetVarNode import SetVarNode
 
 from Core.View.GraphScene import GraphScene
@@ -32,8 +25,6 @@ from Core.View.GraphView import GraphView
 
 from Core.UIPanel.PropertiesPanel import PropertiesPanel
 from Core.UIPanel.GlobalVariablePanel import GlobalVariablePanel
-
-from Style import STYLES
 
 class MainWindow(QMainWindow):
     def __init__(self):

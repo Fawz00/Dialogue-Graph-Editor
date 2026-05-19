@@ -1,6 +1,8 @@
+from typing import Any
+
 from PyQt6.QtGui import QColor
 
-from Core.Debug import Debug
+from Core.Debug.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.Graph.BaseNode import BaseNode
 from Core.Graph.SocketItem import SocketItem
@@ -11,7 +13,6 @@ class PrintNode(BaseNode):
     def __init__(self):
         super().__init__("Print")
         self.header_color = QColor(50, 50, 200, 200)
-        self.var_manager = self.main_window.var_manager
         self.add_socket(True, True)
         self.add_socket(False, True)
 
@@ -28,7 +29,7 @@ class PrintNode(BaseNode):
     def get_properties(self):
         return self.properties
 
-    def set_property(self, key_path: list, value):
+    def set_property(self, key_path: list[str], value: Any):
         super().set_property(key_path, value)
 
         if key_path[0] == "out" and isinstance(value, str):

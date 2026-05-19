@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QMessageBox, QTextBrowser, QToolButton, QWidget, QV
 from PyQt6.QtGui import QAction, QColor, QBrush, QFont, QGuiApplication
 from collections import deque
 
-from Core.Debug import Debug
+from Core.Debug.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType

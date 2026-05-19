@@ -1,14 +1,20 @@
-from PyQt6.QtCore import QThread, pyqtSignal 
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from Core.Debug import Debug
+from PyQt6.QtCore import QThread, pyqtSignal
+
+from Core.Debug.Debug import Debug
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType
 from Core.Graph.EdgeItem import EdgeItem
 from Core.Graph.BaseNode import BaseNode
 from Core.Graph.SocketItem import SocketItem
 
+if TYPE_CHECKING:
+    from Main import MainWindow
+
 class NodeStackFrame:
-    def __init__(self, node: 'BaseNode', edge_from: EdgeItem = None):
+    def __init__(self, node: BaseNode, edge_from: EdgeItem | None = None):
         self.node = node
         self.edge_from = edge_from
 
@@ -16,7 +22,7 @@ class NodeRunner(QThread):
     emit_event_signal = pyqtSignal(object) 
 
     # Tambahkan parameter max_stack_size di __init__
-    def __init__(self, main_window, max_stack_size=256):
+    def __init__(self, main_window: MainWindow, max_stack_size: int = 256):
         super().__init__() 
         self._main_window = main_window
         
@@ -25,15 +31,15 @@ class NodeRunner(QThread):
         self.is_running = False
         self.is_paused = False
         self.stack_trace: list[NodeStackFrame] = []
-        self.current_node: BaseNode = None
+        self.current_node: BaseNode | None = None
         
-        self._target_node: BaseNode = None
+        self._target_node: BaseNode | None = None
 
-        self.emit_event_signal.connect(self._safe_publish_event)
+        self.emit_event_signal.connect(self._safe_publish_event) # type: ignore
 
     def start_execution(self, start_node: BaseNode):
         if self.is_running and not self.is_paused:
-            Debug.log_debug_warning("NodeRunner is already running!")
+            Debug.log_warning("NodeRunner is already running!")
             return
 
         Debug.log_debug("NodeRunner starting execution.")
@@ -106,11 +112,8 @@ class NodeRunner(QThread):
 
 
     #region JUMP
-    def jump_to_node(self, target_node: BaseNode, via_socket: SocketItem = None):
+    def jump_to_node(self, target_node: BaseNode, via_socket: SocketItem):
         if not self.is_running: return
-        if target_node is None:
-            self._finish()
-            return
 
         if via_socket:
             valid_jump = False
@@ -119,22 +122,23 @@ class NodeRunner(QThread):
                     valid_jump = True
                     break
             if not valid_jump:
-                self.fail(f"Invalid jump: No edge from {self.current_node.title} to {target_node.title} via socket {via_socket}")
+                node_name = self.current_node.title if self.current_node else "None"
+                self.fail(f"Invalid jump: No edge from {node_name} to {target_node.title} via socket {via_socket}")
                 return
         
         self._target_node = target_node
     #endregion JUMP
 
     #region FAIL
-    def fail(self, message="Execution failed!"):
-        Debug.log_debug_error(f"Execution failed: {message}")
+    def fail(self, message: str = "Execution failed!"):
+        Debug.log_error(f"Execution failed: {message}")
         self._finish()
     #endregion FAIL
 
 
 
     #region Helper Methods
-    def _safe_publish_event(self, event_obj):
+    def _safe_publish_event(self, event_obj: Event) -> None:
         self._main_window.event_bus.publish(event_obj)
 
     def _execute_node(self, node: BaseNode):
@@ -142,10 +146,11 @@ class NodeRunner(QThread):
             return
 
         Debug.log_debug(f"Executing node: {node.title}")
-        next_socket: SocketItem = self.current_node.execute() 
+        self.current_node = node
+        next_socket: SocketItem | None = node.execute()
 
         prev_node = self.stack_trace[-1].node if self.stack_trace else None
-        edge: EdgeItem = None
+        edge: EdgeItem | None = None
         if prev_node:
             for out_sock in prev_node.outputs:
                 for e in out_sock.edges:

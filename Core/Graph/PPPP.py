@@ -9,7 +9,7 @@ from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
 from Style import STYLES
 from Core.Graph.SocketItem import SocketItem
 from Core.Graph.InlineInput import InlineInput
-from Core.Debug import Debug
+from Core.Debug.Debug import Debug
 from Core.VariableManager import VariableManager
 from Core.Structures.Variable import Variable
 
