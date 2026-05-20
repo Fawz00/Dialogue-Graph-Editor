@@ -7,11 +7,11 @@ from Core.Debug.Debug import Debug
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType
 from Core.Graph.EdgeItem import EdgeItem
-from Core.Graph.BaseNode import BaseNode
-from Core.Graph.SocketItem import SocketItem
 
 if TYPE_CHECKING:
     from Main import MainWindow
+    from Core.Graph.BaseNode import BaseNode
+    from Core.Graph.SocketItem import SocketItem
 
 class NodeStackFrame:
     def __init__(self, node: BaseNode, edge_from: EdgeItem | None = None):

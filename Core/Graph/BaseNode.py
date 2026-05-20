@@ -9,11 +9,11 @@ from PyQt6.QtGui import QPainter, QPen, QPainterPath, QFont
 from Core.Enums.DataType import DataType
 from Core.UIPanel.Utils.PropertyWidgetFactory import PropertyWidgetFactory
 from Style import STYLES
-from Core.Graph.SocketItem import SocketItem
 from Core.Graph.InlineInput import InlineInput
+from Core.Graph.SocketItem import SocketItem
 from Core.Debug.Debug import Debug
 from Core.VariableManager import VariableManager
-from Core.Structures.Variable import Variable
+from Core.Structures.Variable import ValueType, Variable
 
 if TYPE_CHECKING:
     from Main import MainWindow
@@ -287,7 +287,7 @@ class BaseNode(QGraphicsItem):
         """Override ini untuk menampilkan properti di panel samping"""
         return {}
 
-    def set_property(self, key_path: list[str], value: Variable):
+    def set_property(self, key_path: list[str], value: ValueType):
         """Override ini untuk menerima update properti"""
         VariableManager.edit_variable(
             database=self.properties,

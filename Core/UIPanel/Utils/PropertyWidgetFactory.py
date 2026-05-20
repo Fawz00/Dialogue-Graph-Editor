@@ -4,7 +4,7 @@ from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtCore import Qt, QSize
 
 from Core.Enums.DataType import DataType
-from Core.Structures.Variable import Variable
+from Core.Structures.Variable import StructType, Variable
 from Core.VariableManager import VariableManager
 from Style import STYLES
 
@@ -28,46 +28,49 @@ class PropertyWidgetFactory:
 
         # ---------- STRING ----------
         if data_type == DataType.STRING:
-            w = QLineEdit(str(current_value))
-            def on_editing_finished() -> None:
-                on_changed_callback(path, w.text())
+            if isinstance(current_value, str):
+                w = QLineEdit(str(current_value))
+                def on_editing_finished() -> None:
+                    on_changed_callback(path, w.text())
 
-            w.editingFinished.connect(on_editing_finished) # type: ignore
-            layout.addWidget(w)
-            return w
+                w.editingFinished.connect(on_editing_finished) # type: ignore
+                layout.addWidget(w)
+                return w
 
         # ---------- INT ----------
         elif data_type == DataType.INT:
-            w = QSpinBox()
-            w.setRange(-2147483648, 2147483647)
-            try:
-                w.setValue(int(current_value or 0))
-            except:
-                w.setValue(0)
+            if isinstance(current_value, int):
+                w = QSpinBox()
+                w.setRange(-2147483648, 2147483647)
+                try:
+                    w.setValue(int(current_value or 0))
+                except:
+                    w.setValue(0)
 
-            def on_editing_finished() -> None:
-                on_changed_callback(path, w.value())
+                def on_editing_finished() -> None:
+                    on_changed_callback(path, w.value())
 
-            w.editingFinished.connect(on_editing_finished) # type: ignore
-            layout.addWidget(w)
-            return w
+                w.editingFinished.connect(on_editing_finished) # type: ignore
+                layout.addWidget(w)
+                return w
 
         # ---------- FLOAT ----------
         elif data_type == DataType.FLOAT:
-            w = QDoubleSpinBox()
-            w.setDecimals(6)
-            w.setRange(-2147483648.0, 2147483647.0)
-            try:
-                w.setValue(float(current_value or 0.0))
-            except:
-                w.setValue(0.0)
+            if isinstance(current_value, (float, int)):
+                w = QDoubleSpinBox()
+                w.setDecimals(6)
+                w.setRange(-2147483648.0, 2147483647.0)
+                try:
+                    w.setValue(float(current_value or 0.0))
+                except:
+                    w.setValue(0.0)
 
-            def on_editing_finished() -> None:
-                on_changed_callback(path, w.value())
+                def on_editing_finished() -> None:
+                    on_changed_callback(path, w.value())
 
-            w.editingFinished.connect(on_editing_finished) # type: ignore
-            layout.addWidget(w)
-            return w
+                w.editingFinished.connect(on_editing_finished) # type: ignore
+                layout.addWidget(w)
+                return w
 
         # ---------- BOOL ----------
         elif data_type == DataType.BOOL:
@@ -149,20 +152,16 @@ class PropertyWidgetFactory:
         # ---------- LIST ----------
         elif data_type == DataType.LIST:
             section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
-            current_value = cast(list[str], current_value)
+            current_value = cast(list[Variable], current_value)
             element_type = config.element_type or DataType.STRING
 
             for idx, item_value in enumerate(current_value):
-                item_config = Variable(
-                    type=element_type,
-                    value=item_value
-                )
-                item_path = path + [cast(str, idx)]
+                item_path = path + [str(idx)]
 
                 PropertyWidgetFactory.create(
                     content_layout,
                     str(idx),
-                    item_config,
+                    item_value,
                     on_changed_callback,
                     item_path
                 )
@@ -172,6 +171,7 @@ class PropertyWidgetFactory:
 
         # ---------- STRUCT ----------
         elif data_type == DataType.STRUCT:
+            current_value = cast(StructType, current_value)
             section, content_layout = PropertyWidgetFactory._create_collapsible_section(display_name)
 
             for sub_key, sub_config in current_value.items():

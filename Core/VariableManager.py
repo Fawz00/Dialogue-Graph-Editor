@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from typing import Any
 
@@ -247,38 +247,35 @@ class VariableManager(QObject):
         # CHANGE VALUE
         # =========================
         if new_data is not None:
-            if isinstance(new_data, Variable):
-                if new_data.value is not None:
-                    if parent is not None and DataType(parent.type) == DataType.ARRAY:
-                        old_value = target_meta
+            if new_data.value is not None:
+                if parent is not None and DataType(parent.type) == DataType.ARRAY:
+                    old_value = target_meta
 
-                        # Coba pasang dulu
-                        parent.value[key] = new_data.value
+                    # Coba pasang dulu
+                    parent.value[key] = new_data.value
 
-                        # Validasi
-                        if not VariableManager.is_value_valid(new_data, parent.element_type):
-                            # Rollback jika invalid
-                            parent.value[key] = old_value
-                            Debug.log_warning(f"Invalid array element value '{new_data.value}' for type {parent.element_type}.")
-                    else:
-                        old_value = target_meta.value
+                    # Validasi
+                    if not VariableManager.is_value_valid(new_data, parent.element_type):
+                        # Rollback jika invalid
+                        parent.value[key] = old_value
+                        Debug.log_warning(f"Invalid array element value '{new_data.value}' for type {parent.element_type}.")
+                else:
+                    old_value = target_meta.value
 
-                        # Coba pasang dulu
-                        target_meta.value = new_data.value
+                    # Coba pasang dulu
+                    target_meta.value = new_data.value
 
-                        # Validasi
+                    # Validasi
+                    if not VariableManager.is_value_valid(target_meta):
+                        # Rollback jika invalid
+                        target_meta.value = old_value
+
+                        Debug.log_warning(f"Invalid value '{target_meta.value}' for type {target_meta.type}.")
+
+                        # Cek apakah value lama valid, kalau tidak set ke default
                         if not VariableManager.is_value_valid(target_meta):
-                            # Rollback jika invalid
-                            target_meta.value = old_value
+                            VariableManager.reset_to_default_value(target_meta)
 
-                            Debug.log_warning(f"Invalid value '{target_meta.value}' for type {target_meta.type}.")
-
-                            # Cek apakah value lama valid, kalau tidak set ke default
-                            if not VariableManager.is_value_valid(target_meta):
-                                VariableManager.reset_to_default_value(target_meta)
-            else:
-                Debug.log_error("new_data must be an instance of Variable.")
-                return False
         # =========================
         # CHANGE OTHER PROPS
         # =========================
@@ -319,7 +316,7 @@ class VariableManager(QObject):
 
         return True
     
-    def create_global_variable(self, name, var_type, value=None):
+    def create_global_variable(self, name: str, var_type: DataType, value: Any | None = None):
         success = VariableManager.create_variable(self._global_variables, name, var_type, value)
 
         if success:
@@ -330,7 +327,7 @@ class VariableManager(QObject):
             ))
 
     @staticmethod
-    def create_variable(database, name, var_type, value=None) -> bool:
+    def create_variable(database: dict[str, Variable], name: str, var_type: DataType, value: Any | None = None) -> bool:
         if name in database:
             return False  # Sudah ada
         

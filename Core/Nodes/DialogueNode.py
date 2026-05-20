@@ -43,8 +43,10 @@ class DialogueNode(BaseNode):
         self.outputs.clear()
         
         # Buat socket baru berdasarkan pilihan
-        for choice in self.properties["choices"].value:
-            self.add_socket(False, True, label=choice)
+        if isinstance(self.properties["choices"].value, list): # Expected: list[str]
+            for choice in self.properties["choices"].value:
+                if isinstance(choice, str):
+                    self.add_socket(False, True, label=choice)
 
     def get_properties(self):
         return self.properties

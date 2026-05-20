@@ -42,7 +42,8 @@ class SetVarNode(BaseNode):
 
         # Pastikan field Value berubah sesuai tipe variabel
         if key_path[0] == "Variable":
-            sel_var = self.var_manager.get_global_variable(self.properties["Variable"].value) if self.var_manager else None
+            var_name = self.properties["Variable"].value if isinstance(self.properties["Variable"].value, str) else ""
+            sel_var = self.var_manager.get_global_variable(var_name) if self.var_manager else None
             if sel_var is not None:
                 val_data = Variable(
                     type=DataType(sel_var.type),
@@ -67,7 +68,8 @@ class SetVarNode(BaseNode):
                     value_path=["Value"],
                     new_data=val_data)
 
-        self.update_sockets_by_variable(self.properties["Variable"].value)
+        var_name = self.properties["Variable"].value if isinstance(self.properties["Variable"].value, str) else ""
+        self.update_sockets_by_variable(var_name)
         self.update()
 
     def update_sockets_by_variable(self, var_name: str):

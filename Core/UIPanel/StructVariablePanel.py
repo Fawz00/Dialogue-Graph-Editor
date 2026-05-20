@@ -30,7 +30,7 @@ class StructVariablePanel(UIPanelBase):
         self.search_edit = QLineEdit(placeholderText="Search Structures...")
         self.search_edit.textChanged.connect(self.on_search_text_changed)
         form.addWidget(self.search_edit)
-        self.layout.addLayout(form)
+        self.v_layout.addLayout(form)
 
 
 

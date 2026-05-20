@@ -3,16 +3,35 @@ from typing import Any, List, Optional, Dict
 from uuid import uuid4
 from Core.Enums.DataType import DataType
 
+type StructType = dict[str, Variable]
+type ArrayType = dict[int, Variable]
+type ValueType = (
+    StructType
+    | ArrayType
+    | list[Variable]
+    | list[StructType]
+    | list[ArrayType]
+    | list[str]
+    | list[int]
+    | list[float]
+    | list[bool]
+    | str
+    | int
+    | float
+    | bool
+    | None
+)
+
 @dataclass
 class Variable:
     type: DataType | None
-    value: Any
+    value: ValueType
 
     enabled: bool = True
 
     # Optional metadata for variable
-    options: Optional[List[Any]] = None     # For ENUM types
-    element_type: Optional[DataType] = None      # For ARRAY types
+    options: Optional[List[str]] = None     # For ENUM types
+    element_type: Optional[DataType] = None # For ARRAY types
     class_id: Optional[str] = None          # For custom class/Object types
 
     display_name: Optional[str] = None      # Localization fallback
@@ -33,7 +52,7 @@ class Variable:
 
 @dataclass
 class TypeMetadata:
-    options: Optional[List[Any]] = None
+    options: Optional[List[str]] = None
     element_type: Optional[DataType] = None
     class_id: Optional[str] = None
 

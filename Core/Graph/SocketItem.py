@@ -11,7 +11,6 @@ from Style import STYLES, DATA_TYPE_COLORS
 
 if TYPE_CHECKING:
     from Core.Graph.BaseNode import BaseNode
-    from Core.Nodes.RerouteNode import RerouteNode
 
 class SocketItem(QGraphicsItem):
     def __init__(self, parent_node: BaseNode, index: int, is_input: bool = True, is_exec: bool = True, data_type: DataType | None = None, label: str="", prop_reference_path: list[str] = []):
@@ -93,6 +92,8 @@ class SocketItem(QGraphicsItem):
         3. Output Data: MULTI
         4. Input Data:  SINGLE
         """
+        from Core.Nodes.RerouteNode import RerouteNode
+        
         current_sock = self
 
         # Note: `start_sock.parent_node` type == RerouteNode
