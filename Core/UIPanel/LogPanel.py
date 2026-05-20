@@ -496,20 +496,29 @@ class LogPanel(UIPanelBase):
 
         try:
             count = 0
-            added_new = False 
+            added_new = False
+
+            batch: list[LogData] = []
 
             while self.pending_logs and count < self.max_logs_per_flush:
                 payload = self.pending_logs.popleft()
 
-                # payload comes from Event.payload (a dict). LogData expects explicit params
                 log_entry = cast(LogData, payload.get("data"))
 
-                self.add_log_item(log_entry)
+                if log_entry:
+                    batch.append(log_entry)
 
                 count += 1
+
+            # IMPORTANT:
+            # urutkan dulu sebelum insert ke tree
+            batch.sort(key=lambda x: x.sequence)
+
+            for log_entry in batch:
+                self.add_log_item(log_entry)
                 added_new = True
 
-            # Aplikasikan ulang filter agar log yang baru masuk langsung menyesuaikan kondisi
+            # apply filter SETELAH semua item masuk
             if added_new:
                 self.apply_filters()
                 

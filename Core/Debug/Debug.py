@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 import inspect
 import sys
 import datetime
+import threading
+import itertools
 
 from Core.Debug.LogData import LogData
 from Core.Enums.LogLevel import LogLevel
@@ -26,6 +28,8 @@ class Debug:
 
     _main_window: MainWindow | None = None
     log_data: list[LogData] = []
+    _log_lock = threading.RLock()
+    _sequence_counter = itertools.count()
 
     @classmethod
     def set_main_window(cls, main_window: MainWindow):
@@ -55,44 +59,65 @@ class Debug:
 
     @staticmethod
     def _log(level: LogLevel, message: str):
-        color = Debug.LEVELS.get(level.name, '')
-        endc = Debug.LEVELS['ENDC']
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        source = Debug._get_caller_info()
-        traceback = inspect.stack()
+        with Debug._log_lock:
+            color = Debug.LEVELS.get(level.name, '')
+            endc = Debug.LEVELS['ENDC']
 
-        data: LogData = LogData(
-            timestamp=timestamp,
-            level=level,
-            message=message,
-            source=source,
-            traceback=traceback
-        )
+            timestamp = datetime.datetime.now().strftime(
+                '%Y-%m-%d %H:%M:%S.%f'
+            )[:-3]
 
-        Debug.log_data.append(data)
-        
-        # Limit the number of log entries
-        if len(Debug.log_data) > Debug.MAX_LOG_ENTRIES:
-            Debug.log_data.pop(0)
+            source = Debug._get_caller_info()
+            traceback = inspect.stack()
 
-        if Debug._main_window:
-            Debug._main_window.event_bus.publish(Event(
-                type=EventType.EVENT_LOG_ADDED.value,
+            data = LogData(
+                sequence=next(Debug._sequence_counter),
+                timestamp=timestamp,
+                level=level,
+                message=message,
                 source=source,
-                payload={
-                    "data": data
-                }
-            ))
+                traceback=traceback
+            )
 
-        print(f"{color}[{timestamp}] [{level.value}] {message} ({source}){endc}", file=sys.stderr if level == LogLevel.ERROR else sys.stdout)
+            Debug.log_data.append(data)
 
-        if level == LogLevel.ERROR or level == LogLevel.WARNING:
-            print("Traceback (most recent call last):", file=sys.stderr)
-            for frame in traceback[1:]:  # Skip frame _log itu sendiri
-                filename = frame.filename
-                lineno = frame.lineno
-                func = frame.function
-                print(f'  File "{filename}", line {lineno}, in {func}', file=sys.stderr)
+            if len(Debug.log_data) > Debug.MAX_LOG_ENTRIES:
+                Debug.log_data.pop(0)
+
+            if Debug._main_window:
+                Debug._main_window.event_bus.publish(Event(
+                    type=EventType.EVENT_LOG_ADDED.value,
+                    source=source,
+                    payload={
+                        "data": data
+                    }
+                ))
+
+            print(
+                f"{color}[{timestamp}] "
+                f"[{level.value}] "
+                f"{message} ({source}){endc}",
+                file=sys.stderr if level == LogLevel.ERROR else sys.stdout,
+                flush=True
+            )
+
+            if level in (LogLevel.ERROR, LogLevel.WARNING):
+                print(
+                    "Traceback (most recent call last):",
+                    file=sys.stderr,
+                    flush=True
+                )
+
+                for frame in traceback[1:]:
+                    filename = frame.filename
+                    lineno = frame.lineno
+                    func = frame.function
+
+                    print(
+                        f'  File "{filename}", line {lineno}, in {func}',
+                        file=sys.stderr,
+                        flush=True
+                    )
 
     @staticmethod
     def log(message: str):

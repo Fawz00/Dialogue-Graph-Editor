@@ -95,7 +95,7 @@ class NodeRunner(QThread):
         if not self.is_running:
             return
         Debug.log_debug("NodeRunner stop requested.")
-        self._finish() 
+        self._finish()
     
     def request_pause(self):
         if not self.is_running:
@@ -118,7 +118,7 @@ class NodeRunner(QThread):
         if via_socket:
             valid_jump = False
             for edge in via_socket.edges:
-                if edge.start_socket.parent_node == self.current_node and edge.end_socket.parent_node == target_node:
+                if edge.start_socket.parent_node == self.current_node and edge.end_socket is not None and edge.end_socket.parent_node == target_node:
                     valid_jump = True
                     break
             if not valid_jump:
@@ -154,7 +154,7 @@ class NodeRunner(QThread):
         if prev_node:
             for out_sock in prev_node.outputs:
                 for e in out_sock.edges:
-                    if e.start_socket.parent_node == prev_node and e.end_socket.parent_node == node:
+                    if e.start_socket.parent_node == prev_node and e.end_socket is not None and e.end_socket.parent_node == node:
                         edge = e
                         break
                 if edge: break
@@ -168,7 +168,7 @@ class NodeRunner(QThread):
         if next_socket and next_socket.is_exec:
             next_node = None
             for edge_item in next_socket.edges:
-                if edge_item.start_socket == next_socket:
+                if edge_item.start_socket == next_socket and edge_item.end_socket is not None:
                     next_node = edge_item.end_socket.parent_node
                     break
             
@@ -180,12 +180,14 @@ class NodeRunner(QThread):
             self._finish() 
     
     def _finish(self):
-        if not self.is_running:
-            return
+        already_stopped = not self.is_running
 
         self._target_node = None
         self.is_running = False
         self.is_paused = False
+
+        if already_stopped:
+            return
 
         Debug.log_debug("NodeRunner execution finished.")
 

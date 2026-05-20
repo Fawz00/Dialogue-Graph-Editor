@@ -5,6 +5,7 @@ from Core.Enums.LogLevel import LogLevel
 
 @dataclass
 class LogData:
+    sequence: int
     timestamp: str
     level: LogLevel
     message: str

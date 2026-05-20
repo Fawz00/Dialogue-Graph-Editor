@@ -171,6 +171,9 @@ class BaseNode(QGraphicsItem):
                 # Ambil socket lawan
                 other_socket = edge.start_socket if edge.end_socket == socket else edge.end_socket
                 
+                if other_socket is None:
+                    continue
+
                 # Jika tipe data sudah tidak sama, putus koneksinya!
                 if socket.data_type != other_socket.data_type:
                     self.remove_socket(socket)

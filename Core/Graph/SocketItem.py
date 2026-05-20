@@ -93,7 +93,7 @@ class SocketItem(QGraphicsItem):
         4. Input Data:  SINGLE
         """
         from Core.Nodes.RerouteNode import RerouteNode
-        
+
         current_sock = self
 
         # Note: `start_sock.parent_node` type == RerouteNode
@@ -175,9 +175,10 @@ class SocketItem(QGraphicsItem):
                 edge.start_socket.edges.remove(edge)
                 if edge.start_socket.parent_node:
                     edge.start_socket.parent_node.recalculate_layout()
-            if edge in edge.end_socket.edges:
-                edge.end_socket.edges.remove(edge)
-                if edge.end_socket.parent_node:
+            if edge.end_socket is not None:
+                if edge in edge.end_socket.edges:
+                    edge.end_socket.edges.remove(edge)
+                    if edge.end_socket.parent_node:
                         edge.end_socket.parent_node.recalculate_layout()
             edge_scene = edge.scene()
             if edge_scene is not None:
@@ -207,8 +208,8 @@ class SocketItem(QGraphicsItem):
             "label": self.label,
             "connections": [
                 {
-                    "other_node_id": id(edge.end_socket.parent_node) if edge.start_socket == self else id(edge.start_socket.parent_node),
-                    "other_socket_index": edge.end_socket.index if edge.start_socket == self else edge.start_socket.index
+                    "other_node_id": id(edge.end_socket.parent_node) if edge.end_socket is not None and edge.start_socket == self else id(edge.start_socket.parent_node),
+                    "other_socket_index": edge.end_socket.index if edge.end_socket is not None and edge.start_socket == self else edge.start_socket.index
                 }
                 for edge in self.edges
             ]

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from Core.Graph.SocketItem import SocketItem
 
 class EdgeItem(QGraphicsPathItem):
-    def __init__(self, start_socket: SocketItem, end_socket: SocketItem, cur_mouse_pos: QPointF | None = None):
+    def __init__(self, start_socket: SocketItem, end_socket: SocketItem | None, cur_mouse_pos: QPointF | None = None):
         super().__init__()
         self.setZValue(-1) # Gambar di belakang node
         self.start_socket = start_socket

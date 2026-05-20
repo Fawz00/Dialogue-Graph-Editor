@@ -1,19 +1,15 @@
-import sys
-from PyQt6.QtWidgets import (QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, 
-                             QPushButton, QComboBox, QTreeWidget, QTreeWidgetItem, QMenu)
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from Core.Debug.Debug import Debug
-from Core.Enums.DataType import DataType
-from Core.EventSystem.Event import Event
-from Core.EventSystem.EventType import EventType
-from Core.Nodes.SetVarNode import SetVarNode
+from PyQt6.QtWidgets import QHBoxLayout, QLineEdit
+
 from Core.UIPanelBase import UIPanelBase
-from Core.VariableManager import VariableManager
-from Core.UIPanel.Utils.TypeDelegate import TypeDelegate
+
+if TYPE_CHECKING:
+    from Main import MainWindow
 
 class StructVariablePanel(UIPanelBase):
-    def __init__(self, main_window):
+    def __init__(self, main_window: MainWindow):
         super().__init__(main_window)
         self.search_edit = None
 
@@ -27,8 +23,9 @@ class StructVariablePanel(UIPanelBase):
 
         # UI Search Section
         form = QHBoxLayout()
-        self.search_edit = QLineEdit(placeholderText="Search Structures...")
-        self.search_edit.textChanged.connect(self.on_search_text_changed)
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Search Struct Variables...")
+        self.search_edit.textChanged.connect(self.on_search_text_changed) # type: ignore
         form.addWidget(self.search_edit)
         self.v_layout.addLayout(form)
 
@@ -36,6 +33,6 @@ class StructVariablePanel(UIPanelBase):
 
     # ========== Event Handlers ==========
 
-    def on_search_text_changed(self, text):
+    def on_search_text_changed(self, text: str):
         # TODO: Implement search/filtering logic for structures
         return
