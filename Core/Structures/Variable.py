@@ -35,6 +35,7 @@ class Variable:
     options: Optional[List[str]] = None     # For ENUM types
     element_type: Optional[DataType] = None # For ARRAY types
     class_id: Optional[str] = None          # For custom class/Object types
+    struct_id: Optional[str] = None         # For custom struct types
 
     display_name: Optional[str] = None      # Localization fallback
     localization_key: Optional[str] = None
@@ -56,6 +57,7 @@ class TypeMetadata:
     options: Optional[List[str]] = None
     element_type: Optional[DataType] = None
     class_id: Optional[str] = None
+    struct_id: Optional[str] = None
 
 @dataclass
 class UIMetadata:

@@ -1,12 +1,8 @@
-import sys, select, threading 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView, 
-                             QGraphicsItem, QGraphicsPathItem, QGraphicsProxyWidget,
-                             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QLayout,
-                             QPushButton, QComboBox, QDockWidget, QListWidget, QFormLayout,
-                             QMenu, QTreeWidget, QTreeWidgetItem, QMessageBox, QToolBar, QMenuBar, QStatusBar,
-                             QSizePolicy)
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QAction, QKeySequence, QIcon, QUndoStack
+import sys
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QDockWidget,  
+                             QMessageBox, QToolBar, QSizePolicy)
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QCloseEvent, QAction, QKeySequence, QIcon, QUndoStack
 
 from Core.Debug.Debug import Debug
 from Core.EventSystem.Event import Event
@@ -121,10 +117,10 @@ class MainWindow(QMainWindow):
         self.log_dock.setWidget(self.log_panel)
 
         # --- Set View ---
-        self.view_reset_layout(None) # Atur posisi dan visibilitas dock sesuai layout awal
+        self.view_reset_layout() # Atur posisi dan visibilitas dock sesuai layout awal
 
         # --- Register event ---
-        self.var_panel.variable_selected.connect(self.properties_panel.load_variable)        
+        self.var_panel.variable_selected.connect(self.properties_panel.load_variable) # type: ignore     
     
     def setup_toolbar(self):
         self.toolbar = QToolBar("Execution Control")
@@ -141,20 +137,20 @@ class MainWindow(QMainWindow):
 
         # Action Run
         self.run_act = QAction(QIcon("resources/run.png"), "Run", self)
-        self.run_act.triggered.connect(self.on_run_pressed)
-        self.toolbar.addAction(self.run_act)
+        self.run_act.triggered.connect(self.on_run_pressed) # type: ignore
+        self.toolbar.addAction(self.run_act) # type: ignore
 
         # Action Pause
         self.pause_act = QAction(QIcon("resources/pause.png"), "Pause", self)
         self.pause_act.setEnabled(False) # Mati sampai dijalankan
-        self.pause_act.triggered.connect(self.on_pause_pressed)
-        self.toolbar.addAction(self.pause_act)
+        self.pause_act.triggered.connect(self.on_pause_pressed) # type: ignore
+        self.toolbar.addAction(self.pause_act) # type: ignore
 
         # Action Stop
         self.stop_act = QAction(QIcon("resources/stop.png"), "Stop", self)
         self.stop_act.setEnabled(False)
-        self.stop_act.triggered.connect(self.on_stop_pressed)
-        self.toolbar.addAction(self.stop_act)
+        self.stop_act.triggered.connect(self.on_stop_pressed) # type: ignore
+        self.toolbar.addAction(self.stop_act) # type: ignore
 
         # Right Spacer
         right_spacer = QWidget()
@@ -165,90 +161,124 @@ class MainWindow(QMainWindow):
 
     def setup_menu(self):
         self.menu_bar = self.menuBar()
+
+        if self.menu_bar is None:
+            Debug.log("Error creating menu bar")
+            return
         
         # === FILE MENU ===
         file_menu = self.menu_bar.addMenu("&File") # Tanda & membuat shortcut Alt+F
+
+        if file_menu is None:
+            Debug.log("Error creating File menu")
+            return
         
         # Actions (Placeholder)
         act_open = QAction("Open", self)
         act_open.setShortcut(QKeySequence.StandardKey.Open)
-        act_open.triggered.connect(self.file_open)
-        file_menu.addAction(act_open)
+        act_open.triggered.connect(self.file_open) # type: ignore
+        file_menu.addAction(act_open) # type: ignore
 
         act_save = QAction("Save", self)
         act_save.setShortcut(QKeySequence.StandardKey.Save)
-        act_save.triggered.connect(self.file_save)
-        file_menu.addAction(act_save)
+        act_save.triggered.connect(self.file_save) # type: ignore
+        file_menu.addAction(act_save) # type: ignore
 
         act_save_as = QAction("Save As...", self)
         act_save_as.setShortcut(QKeySequence.StandardKey.SaveAs)
-        act_save_as.triggered.connect(self.file_save_as)
-        file_menu.addAction(act_save_as)
+        act_save_as.triggered.connect(self.file_save_as) # type: ignore
+        file_menu.addAction(act_save_as) # type: ignore
         
         file_menu.addSeparator() # Garis pemisah
         
         act_export = QAction("Export", self)
-        act_export.triggered.connect(self.file_export)
-        file_menu.addAction(act_export)
+        act_export.triggered.connect(self.file_export) # type: ignore
+        file_menu.addAction(act_export) # type: ignore
 
         # === EDIT MENU ===
         edit_menu = self.menu_bar.addMenu("&Edit")
 
+        if edit_menu is None:
+            Debug.log("Error creating Edit menu")
+            return
+
         # Actions
         # act_undo = QAction("Undo", self)
         act_undo = self.undo_stack.createUndoAction(self, "Undo")
+        if act_undo is None:
+            Debug.log("Error creating Undo action")
+            return
         act_undo.setShortcut(QKeySequence.StandardKey.Undo)
-        edit_menu.addAction(act_undo)
+        edit_menu.addAction(act_undo) # type: ignore
 
         # act_redo = QAction("Redo", self)
         act_redo = self.undo_stack.createRedoAction(self, "Redo")
+        if act_redo is None:
+            Debug.log("Error creating Redo action")
+            return
         act_redo.setShortcut(QKeySequence.StandardKey.Redo)
-        edit_menu.addAction(act_redo)
+        edit_menu.addAction(act_redo) # type: ignore
 
         edit_menu.addSeparator()
 
         act_preferences = QAction("Preferences", self)
-        edit_menu.addAction(act_preferences)
+        edit_menu.addAction(act_preferences) # type: ignore
 
         act_project_settings = QAction("Project Settings", self)
-        edit_menu.addAction(act_project_settings)
+        edit_menu.addAction(act_project_settings) # type: ignore
         
         # === VIEW MENU ===
         view_menu = self.menu_bar.addMenu("&View")
+
+        if view_menu is None:
+            Debug.log("Error creating View menu")
+            return
         
         # Reset Layout Action
         act_reset = QAction("Reset Layout", self)
-        act_reset.triggered.connect(self.view_reset_layout)
-        view_menu.addAction(act_reset)
+        act_reset.triggered.connect(self.view_reset_layout) # type: ignore
+        view_menu.addAction(act_reset) # type: ignore
         
         view_menu.addSeparator()
 
         # Window Submenu
         window_menu = view_menu.addMenu("Window")
+
+        if window_menu is None:
+            Debug.log("Error creating Window submenu")
+            return
         
         # Magic PyQt: toggleViewAction()
         # Method ini otomatis membuat Action yang 'Checkable'.
         # Jika dock tertutup, menu ini jadi unchecked. Jika diklik, dock terbuka kembali.
-        window_menu.addAction(self.dock_vars.toggleViewAction())
-        window_menu.addAction(self.dock_structs.toggleViewAction())
-        window_menu.addAction(self.dock_funcs.toggleViewAction())
-        window_menu.addAction(self.dock_props.toggleViewAction())
-        window_menu.addAction(self.log_dock.toggleViewAction())
-        window_menu.addAction(self.toolbar.toggleViewAction())
+        window_menu.addAction(self.dock_vars.toggleViewAction()) # type: ignore
+        window_menu.addAction(self.dock_structs.toggleViewAction()) # type: ignore
+        window_menu.addAction(self.dock_funcs.toggleViewAction()) # type: ignore
+        window_menu.addAction(self.dock_props.toggleViewAction()) # type: ignore
+        window_menu.addAction(self.log_dock.toggleViewAction()) # type: ignore
+        window_menu.addAction(self.toolbar.toggleViewAction()) # type: ignore
 
         # === HELP MENU ===
         help_menu = self.menu_bar.addMenu("&Help")
+
+        if help_menu is None:
+            Debug.log("Error creating Help menu")
+            return
         
         act_about = QAction("About", self)
-        act_about.triggered.connect(self.help_about)
-        help_menu.addAction(act_about)
+        act_about.triggered.connect(self.help_about) # type: ignore
+        help_menu.addAction(act_about) # type: ignore
 
         # === WINDOW MENU ===
         app_menu = self.menu_bar.addMenu("&Application")
+
+        if app_menu is None:
+            Debug.log("Error creating Application menu")
+            return
         
         act_quit = QAction("Quit", self)
-        act_quit.triggered.connect(self.quit_application)
-        app_menu.addAction(act_quit)
+        act_quit.triggered.connect(self.quit_application) # type: ignore
+        app_menu.addAction(act_quit) # type: ignore
     
     def create_initial_nodes(self):
         self.start_node = StartNode()
@@ -263,7 +293,7 @@ class MainWindow(QMainWindow):
     # ===== ACTION HANDLERS =====
     #region Action Handlers
 
-    def view_reset_layout(self, menu: QMenuBar):
+    def view_reset_layout(self):
         # 1. Pastikan dock terlihat (mungkin user me-close nya)
         self.dock_vars.setVisible(True)
         self.dock_structs.setVisible(True)
@@ -287,8 +317,10 @@ class MainWindow(QMainWindow):
 
         self.tabifyDockWidget(self.dock_structs, self.dock_funcs)
         
-        self.toolbar.toggleViewAction().setChecked(True)
-        
+        toggle_action = self.toolbar.toggleViewAction()
+        if toggle_action:
+            toggle_action.setChecked(True)
+
         # Opsional: Reset ukuran window utama jika mau
         # self.resize(1000, 700)
     
@@ -335,11 +367,15 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             QApplication.quit()
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0: QCloseEvent | None):
+        if a0 is None:
+            super().closeEvent(a0)
+            return
+
         if self.quit_application():
-            event.accept()
+            a0.accept()
         else:
-            event.ignore()
+            a0.ignore()
 
     #endregion Action Handlers
 
@@ -350,16 +386,16 @@ class MainWindow(QMainWindow):
 
     def on_variable_updated(self, event: Event):
         """Dipanggil saat variabel diubah"""
-        old_name = event.payload.get("old_name")
-        new_name = event.payload.get("new_name")
+        old_name = event.payload.get("old_name", "")
+        new_name = event.payload.get("new_name", "")
         
         # 1. Update logika node dan putus koneksi yang tidak valid (kode sebelumnya)
         for item in self.scene.items():
             if isinstance(item, SetVarNode):
                 if item.selected_var == old_name:
-                    item.selected_var = new_name
-                    item.set_property("Variable", new_name)
-                    item.update_sockets_by_variable(new_name)
+                    item.selected_var = new_name if isinstance(new_name, str) else ""
+                    item.set_property(["Variable"], new_name if isinstance(new_name, str) else "")
+                    item.update_sockets_by_variable(new_name if isinstance(new_name, str) else "")
                 item.validate_socket_connections()
 
         # 2. REFRESH PANEL DETAILS
@@ -369,7 +405,7 @@ class MainWindow(QMainWindow):
     
     def on_variable_deleted(self, event: Event):
         """Dipanggil saat variabel dihapus"""
-        name = event.payload.get("name")
+        name = event.payload.get("name", "")
 
         for item in self.scene.items():
             if isinstance(item, SetVarNode):

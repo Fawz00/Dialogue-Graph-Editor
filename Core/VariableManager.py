@@ -390,10 +390,6 @@ class VariableManager(QObject):
 
     @staticmethod
     def reset_to_default_value(var: Variable):
-        if var is None:
-            Debug.log_error("Cannot reset to default value: Variable is None.")
-            return
-        
         if DataType(var.type) is DataType.ENUM:
             if var.options and len(var.options) > 0:
                 options_list = list(var.options)
@@ -403,12 +399,19 @@ class VariableManager(QObject):
                 Debug.log_warning("ENUM variable has no options to set default value.")
             return
         else:
-            var.value = VariableManager.get_default_value(var.type)
+            if var.type is not None:
+                var.value = VariableManager.get_default_value(var.type)
+            else:
+                Debug.log_warning("Variable type is None, cannot reset to default value.")
     
     @staticmethod
-    def try_to_assign_value(var: Variable, new_value) -> bool:
+    def try_to_assign_value(var: Variable, new_value: ValueType) -> bool:
         """Mencoba mengonversi dan menetapkan nilai baru ke variabel. Mengembalikan True jika berhasil."""
         try:
+            if var.type is None:
+                Debug.log_warning("Variable type is None, cannot assign value.")
+                return False
+
             converted_value = VariableManager.convert_variable_to_type(Variable(value=new_value, type=var.type), var.type)
             if VariableManager.is_value_valid(Variable(value=converted_value, type=var.type), var.type):
                 var.value = converted_value
@@ -425,11 +428,7 @@ class VariableManager(QObject):
         """
         Mengonversi nilai ke tipe data tertentu.
         Mengembalikan nilai yang dikonversi atau None jika gagal.
-        """
-        if var is None:
-            Debug.log_error("Cannot convert variable: Variable is None.")
-            return
-    
+        """    
         try:
             # ===============================
             # NORMALISASI TYPE
@@ -452,21 +451,25 @@ class VariableManager(QObject):
                 return
 
             if dtype == DataType.INT:
-                var.value = int(var.value)
+                if isinstance(var.value, (str, int, float, bool)):
+                    var.value = int(var.value)
                 return
 
             if dtype == DataType.FLOAT:
-                var.value = float(var.value)
+                if isinstance(var.value, (str, int, float, bool)):
+                    var.value = float(var.value)
                 return
 
             if dtype == DataType.BOOL:
-                if isinstance(var.value, str):
-                    val_lower = var.value.lower()
-                    if val_lower in ["true", "1", "yes"]:
-                        var.value = True
+                if isinstance(var.value, (str, int, float, bool)):
+                    if isinstance(var.value, str):
+                        val_lower = var.value.lower()
+                        if val_lower in ["true", "1", "yes"]:
+                            var.value = True
+                        else:
+                            var.value = False
                     else:
-                        var.value = False
-                var.value = bool(var.value)
+                        var.value = bool(var.value)
                 return
             
         except Exception:
@@ -475,7 +478,7 @@ class VariableManager(QObject):
         VariableManager.reset_to_default_value(var)
 
     @staticmethod
-    def is_value_valid(meta: Variable, dtype: DataType|str = None) -> bool:
+    def is_value_valid(meta: Variable, dtype: DataType | None = None) -> bool:
         """
         Mengecek apakah value valid untuk DataType tertentu
         berdasarkan metadata variabel.
@@ -496,24 +499,16 @@ class VariableManager(QObject):
             # PRIMITIVE TYPES
             # ===============================
             if dtype == DataType.STRING:
-                return isinstance(str(value), str)
+                return isinstance(value, str)
 
             if dtype == DataType.INT:
-                try:
-                    int(value)
-                    return True
-                except:
-                    return False
+                return isinstance(value, int) and not isinstance(value, bool)  # bool turunan dari int, harus dikecualikan
 
             if dtype == DataType.FLOAT:
-                try:
-                    float(value)
-                    return True
-                except:
-                    return False
+                return isinstance(value, float)  # float adalah tipe data dasar
 
             if dtype == DataType.BOOL:
-                return isinstance(bool(value), bool)
+                return isinstance(value, bool)
 
             # ===============================
             # ENUM
@@ -533,8 +528,12 @@ class VariableManager(QObject):
                     return False
 
                 for item in value:
-                    if not VariableManager.is_value_valid(Variable(value=item, type=meta.element_type)):
-                        return False
+                    if not isinstance(item, Variable):
+                        if not VariableManager.is_value_valid(Variable(value=item, type=meta.element_type)):
+                            return False
+                    else:
+                        if not VariableManager.is_value_valid(item):
+                            return False
                 return True
 
             # ===============================
@@ -545,44 +544,50 @@ class VariableManager(QObject):
                     return False
 
                 for item in value:
-                    if not VariableManager.is_value_valid(item):
-                        return False
+                    if not isinstance(item, Variable):
+                        if not VariableManager.is_value_valid(Variable(value=item, type=meta.element_type)):
+                            return False
+                    else:
+                        if not VariableManager.is_value_valid(item):
+                            return False
                 return True
 
             # ===============================
             # STRUCT
             # ===============================
+            # NOT IMPLEMENTED: STRUCT validation requires schema definition which is not implemented yet.
             if dtype == DataType.STRUCT:
                 if not isinstance(value, dict):
                     return False
 
-                structure = meta.structure
+                structure = meta.structure # type: ignore
                 if not structure:
                     return True
 
-                for key, field_meta in structure.items():
+                for key, field_meta in structure.items(): # type: ignore
                     if key not in value:
                         return False
 
-                    field_type = field_meta.get("type")
+                    field_type = field_meta.get("type") # type: ignore
                     field_value = value[key]
 
-                    if not VariableManager.is_value_valid(Variable(value=field_value, type=field_type)):
+                    if not VariableManager.is_value_valid(Variable(value=field_value, type=field_type)): # type: ignore
                         return False
                 return True
 
             # ===============================
             # OBJECT
             # ===============================
+            # NOT IMPLEMENTED: OBJECT validation requires class definition which is not implemented yet.
             if dtype == DataType.OBJECT:
-                class_name = meta.class_name
+                class_name = meta.class_name # type: ignore
                 if not class_name:
                     return False
 
                 if isinstance(value, str):
                     return True
 
-                return value.__class__.__name__ == class_name
+                return value.__class__.__name__ == class_name # type: ignore
 
         except Exception:
             return False
