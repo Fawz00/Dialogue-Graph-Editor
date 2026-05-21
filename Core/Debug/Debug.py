@@ -24,7 +24,7 @@ class Debug:
         'CRITICAL': '\033[95m', # Magenta
         'ENDC': '\033[0m',      # Reset
     }
-    MAX_LOG_ENTRIES = 1048576  # Limit log entries to prevent memory bloat
+    MAX_LOG_ENTRIES = 2048  # Limit log entries to prevent memory bloat
 
     _main_window: MainWindow | None = None
     log_data: list[LogData] = []

@@ -4,13 +4,15 @@ from uuid import uuid4
 from Core.Enums.DataType import DataType
 
 type StructType = dict[str, Variable]
-type ArrayType = dict[int, Variable]
+type ArrayType = list[ValueType]
+type ListType = list[Variable]
 type ValueType = (
     StructType
     | ArrayType
-    | list[Variable]
+    | ListType
     | list[StructType]
     | list[ArrayType]
+    | list[ListType]
     | list[str]
     | list[int]
     | list[float]
@@ -39,7 +41,6 @@ class Variable:
     comment: Optional[str] = None
     placeholder: Optional[str] = None       # For STRING, UI display
     editable: bool = True                   # Can be edited in UI
-    meta_editable: bool = True              # Can edit metadata in UI
     hints: Optional[Dict[str, Any]] = None  # Additional hints for UI or processing
 
     _id: str = field(default_factory=lambda: uuid4().hex, init=False, repr=False)
@@ -64,4 +65,3 @@ class UIMetadata:
     placeholder: Optional[str] = None
     hints: Optional[Dict[str, Any]] = None
     editable: bool = True
-    meta_editable: bool = True

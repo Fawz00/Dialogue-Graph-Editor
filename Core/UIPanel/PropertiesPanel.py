@@ -107,7 +107,7 @@ class PropertiesPanel(UIPanelBase):
             new_other_props: dict[str, Any] = {}
 
             if path[0] == "var_name":
-                new_name = value
+                new_name = str(value) if isinstance(value, str) else None
             elif path[0] == "var_type":
                 new_type = DataType(value)
             elif path[0] == "default_value":
@@ -116,7 +116,7 @@ class PropertiesPanel(UIPanelBase):
                 new_other_props["element_type"] = DataType(value)
             
             # Validasi
-            if new_name != old_name and new_name is not None and isinstance(new_name, str) and self.var_manager.get_global_variable(new_name) is not None:
+            if new_name != old_name and new_name is not None and self.var_manager.get_global_variable(new_name) is not None:
                 QMessageBox.warning(self, "Rename Error", f"Name '{new_name}' is already in use!")
                 new_name = None
             
@@ -124,14 +124,14 @@ class PropertiesPanel(UIPanelBase):
             full_path: list[str] = [old_name, *path[1:]]
             new_data = Variable(
                 type=new_type,
-                value=new_value if new_value is not None else None,
+                value=new_value,
                 options=new_other_props.get("options"),
                 element_type=new_other_props.get("element_type")
             )
 
             self.var_manager.edit_global_variable(
                 value_path=full_path,
-                new_name=str(new_name),
+                new_name=new_name,
                 new_data=new_data
             )
     

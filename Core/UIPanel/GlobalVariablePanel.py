@@ -211,7 +211,7 @@ class GlobalVariablePanel(UIPanelBase):
 
         # --- UPDATE MANAGER ---
         new_data = Variable(
-            type=DataType(new_type),
+            type=DataType(new_type) if new_type else None,
             value=None
         )
         

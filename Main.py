@@ -294,7 +294,7 @@ class MainWindow(QMainWindow):
     
     def on_run_pressed(self):
         # Panggil fungsi interpreter
-        if self.node_runner.is_running and self.node_runner.is_paused:
+        if self.node_runner.running and self.node_runner.paused:
             self.node_runner.request_resume()
         else:
             self.node_runner.start_execution(self.start_node)

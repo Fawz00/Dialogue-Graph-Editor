@@ -9,7 +9,7 @@ from Core.Debug.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.EventSystem.Event import Event
 from Core.EventSystem.EventType import EventType
-from Core.Structures.Variable import Variable
+from Core.Structures.Variable import ArrayType, ListType, StructType, ValueType, Variable
 
 if TYPE_CHECKING:
     from Main import MainWindow
@@ -91,6 +91,37 @@ class VariableManager(QObject):
                             Variable(type=DataType.FLOAT, value=3.14),
                             Variable(type=DataType.STRING, value="Hello")
                         ]
+                    ),
+                    "AnotherNested": Variable(
+                        type=DataType.STRUCT,
+                        value={
+                            "Into": Variable(type=DataType.INT, value=1),
+                            "booru": Variable(type=DataType.BOOL, value=False),
+                            "Sutorin": Variable(type=DataType.STRING, value="None"),
+
+                            "Golden Array": Variable(
+                                type=DataType.ARRAY,
+                                element_type=DataType.STRING,
+                                value=["Crimsom Agate", "Deluxe Ignite", "Guenuss Abilitus"]
+                            ),
+
+                            "The Great List": Variable(
+                                type=DataType.LIST,
+                                value=[
+                                    Variable(type=DataType.INT, value=4294967296),
+                                    Variable(type=DataType.FLOAT, value=3.14159265358979),
+                                    Variable(type=DataType.STRING, value="こんにちは"),
+                                    Variable(
+                                        type=DataType.STRUCT,
+                                        value={
+                                            "Into": Variable(type=DataType.INT, value=1),
+                                            "booru": Variable(type=DataType.BOOL, value=False),
+                                            "Sutorin": Variable(type=DataType.STRING, value="None"),
+                                        }
+                                    )
+                                ]
+                            )
+                        }
                     )
                 }
             )
@@ -131,47 +162,59 @@ class VariableManager(QObject):
     
     @staticmethod
     def edit_variable(database: dict[str, Variable], value_path: list[str], new_name: str | None = None, new_data: Variable | None = None) -> bool:
-        def get_nested_meta(current_meta: Variable, path: list[str]):
-            parent = None
-            key = None
-            meta = current_meta
+        def get_nested_var(path: list[str] = value_path) -> tuple[Variable | None, str | int | None, Variable | ValueType | None]: # parent, key, child
+            if not path:
+                Debug.log_error("Value path is empty in get_nested_var.")
+                return None, None, None
+            if path[0] not in database:
+                Debug.log_error(f"Variable '{path[0]}' does not exist in get_nested_var.")
+                return None, None, None
+            
+            parent: Variable | None = None
+            key: str | int | None = None
+            child: Variable | ValueType | None = database.get(path[0], None)
 
             for segment in path[1:]:
-                parent = meta
+                parent = child if isinstance(child, Variable) else None
 
-                if DataType(meta.type) == DataType.STRUCT:
-                    meta = meta.value.get(segment)
+                if parent is None:
+                    Debug.log_error(f"Path '{path}' does not exist.")
+                    return None, None, None
+
+                if DataType(parent.type) == DataType.STRUCT:
+                    value = cast(StructType, parent.value)
+                    child = value.get(segment, None)
+                    if not child:
+                        Debug.log_warning(f"Key '{segment}' not found in STRUCT at '{path}'.")
                     key = segment
 
-                elif DataType(meta.type) == DataType.ARRAY:
+                elif DataType(parent.type) == DataType.ARRAY:
                     try:
                         idx = int(segment)
-                        meta = meta.value[idx]
-
+                        value = cast(ArrayType, parent.value)
+                        child = value[idx]
                         key = idx
+
                     except (ValueError, IndexError):
-                        Debug.log_error(f"Invalid list index '{segment}' while editing '{path}'.")
+                        Debug.log_error(f"Invalid array index '{segment}' while editing '{path}'.")
                         return None, None, None
                 
-                elif DataType(meta.type) == DataType.LIST:
+                elif DataType(parent.type) == DataType.LIST:
                     try:
                         idx = int(segment)
-                        meta = meta.value[idx]
-
+                        value = cast(ListType, parent.value)
+                        child = value[idx]
                         key = idx
+
                     except (ValueError, IndexError):
                         Debug.log_error(f"Invalid list index '{segment}' while editing '{path}'.")
                         return None, None, None
 
                 else:
-                    Debug.log_error(f"Cannot traverse into type {meta.type} at '{segment}'.")
+                    Debug.log_error(f"Cannot traverse into type {parent.type} at '{segment}'.")
                     return None, None, None
 
-                if meta is None:
-                    Debug.log_error(f"Path '{path}' does not exist.")
-                    return None, None, None
-
-            return parent, key, meta
+            return parent, key, child
 
         # Edit variable berdasarkan path
         if not value_path:
@@ -184,21 +227,14 @@ class VariableManager(QObject):
             Debug.log_error(f"Variable '{old_var_name}' does not exist.")
             return False
 
-        root_meta = database[old_var_name]
-        parent: Variable | Any | None = None
-        target_meta: Variable | None = None
+        parent, key, child = get_nested_var(value_path)
 
-        if len(value_path) == 1:
-            key = old_var_name
-            target_meta = root_meta
-        else:
-            parent, key, target_meta = get_nested_meta(root_meta, value_path)
-            if target_meta is None:
-                Debug.log_error(f"Failed to get target meta for path '{value_path}'.")
-                return False
+        if child is None:
+            Debug.log_error(f"Failed to get child for path '{value_path}'.")
+            return False
 
         # =========================
-        # RENAME / REORDER
+        # RENAME ROOT
         # =========================
         if new_name is not None:
 
@@ -211,108 +247,101 @@ class VariableManager(QObject):
                 database[new_name] = database.pop(old_var_name)
                 key = new_name
 
-            # STRUCT
-            elif isinstance(parent, dict):
-                if new_name in parent:
-                    Debug.log_error(f"Variable '{new_name}' already exists.")
-                    return False
-                parent[new_name] = parent.pop(key)
-                key = new_name
-
-            # LIST reorder
-            elif isinstance(parent, list):
-                try:
-                    new_index = int(new_name)
-                except ValueError:
-                    Debug.log_error("List reorder requires integer index.")
-                    return False
-
-                old_index = key
-                list_len = len(parent)
-
-                if not (0 <= new_index < list_len):
-                    Debug.log_error(f"Index {new_index} out of range for list reorder.")
-                    return False
-
-                if new_index != old_index:
-                    item = parent.pop(old_index)
-                    parent.insert(new_index, item)
-                    key = new_index
-
-            else:
-                Debug.log_error(f"Invalid parent type ({type(parent)}) for rename/reorder.")
-                return False
-
         # =========================
         # CHANGE VALUE
         # =========================
         if new_data is not None:
             if new_data.value is not None:
-                if parent is not None and DataType(parent.type) == DataType.ARRAY:
-                    old_value = target_meta
+                if parent is not None:
 
-                    # Coba pasang dulu
-                    parent.value[key] = new_data.value
+                    # ARRAY element change
+                    # parent = the array itself (Variable)
+                    # key = index in array (int)
+                    # child = value at that index (ValueType)
+                    if parent.type == DataType.ARRAY:
+                        array_value = cast(ArrayType, parent.value)
+                        old_value = cast(ValueType, child)
 
-                    # Validasi
-                    if not VariableManager.is_value_valid(new_data, parent.element_type):
-                        # Rollback jika invalid
-                        parent.value[key] = old_value
-                        Debug.log_warning(f"Invalid array element value '{new_data.value}' for type {parent.element_type}.")
-                else:
-                    old_value = target_meta.value
+                        try:
+                            key = int(key) if key is not None else -1
+                        except ValueError:
+                            Debug.log_error("Invalid array index for value change.")
+                            return False
 
-                    # Coba pasang dulu
-                    target_meta.value = new_data.value
+                        # Coba pasang dulu
+                        array_value[key] = new_data.value
 
-                    # Validasi
-                    if not VariableManager.is_value_valid(target_meta):
-                        # Rollback jika invalid
-                        target_meta.value = old_value
+                        # Validasi
+                        if not VariableManager.is_value_valid(new_data, DataType(parent.element_type)):
+                            # Rollback jika invalid
+                            array_value[key] = old_value
+                            Debug.log_warning(f"Invalid array element value '{new_data.value}' for type {parent.element_type}.")
+                
+                    # List element tidak perlu validasi parent karena List bisa menampung berbagai tipe, validasi langsung pada elementnya saja
+                
+                # Tipe primitif tidak harus validasi parent
+                # PRIMITIVE
+                target_var = cast(Variable, child)
+                old_val = target_var.value
 
-                        Debug.log_warning(f"Invalid value '{target_meta.value}' for type {target_meta.type}.")
+                # Coba pasang dulu
+                target_var.value = new_data.value
 
-                        # Cek apakah value lama valid, kalau tidak set ke default
-                        if not VariableManager.is_value_valid(target_meta):
-                            VariableManager.reset_to_default_value(target_meta)
+                # Validasi
+                if not VariableManager.is_value_valid(target_var):
+                    # Rollback jika invalid
+                    target_var.value = old_val
 
-        # =========================
-        # CHANGE OTHER PROPS
-        # =========================
-        # Options
-        if new_data.options is not None:
-            target_meta.options = new_data.options
-        elif isinstance(target_meta, Variable):
-            if DataType(target_meta.type) != DataType.ENUM:
-                target_meta.options = None
+                    Debug.log_warning(f"Invalid value '{target_var.value}' for type {target_var.type}.")
+
+                    # Cek apakah value lama valid, kalau tidak set ke default
+                    if not VariableManager.is_value_valid(target_var):
+                        VariableManager.reset_to_default_value(target_var)
+
+            # =========================
+            # CHANGE OTHER PROPS
+            # =========================
+            # Options
+            if isinstance(parent, Variable):
+                if new_data.options:
+                    parent.options = new_data.options
+                elif DataType(parent.type) != DataType.ENUM:
+                    parent.options = None
         
-        # Element Type
-        if new_data.element_type is not None:
-            target_meta.element_type = new_data.element_type
-        elif isinstance(target_meta, Variable):
-            if DataType(target_meta.type) != DataType.ARRAY:
-                target_meta.element_type = None
+            # Element Type
+            if isinstance(parent, Variable):
+                if new_data.element_type is not None:
+                    parent.element_type = new_data.element_type
+                elif DataType(parent.type) != DataType.ARRAY:
+                    parent.element_type = None
 
-        # =========================
-        # CHANGE TYPE
-        # =========================
-        if new_data.type is not None and new_data.type != target_meta.type:
-            target_meta.type = new_data.type
+            # =========================
+            # CHANGE TYPE
+            # =========================
+            if new_data.type is not None:
+                if parent is not None and parent.type is (DataType.ARRAY or DataType.LIST) and new_data.type == parent.type:
+                    return True  # Tidak perlu ubah tipe jika sama
 
-            # Bersihkan metadata lama
-            target_meta.options = None
-            target_meta.element_type = None
+                if isinstance(child, Variable):
+                    child.type = new_data.type
 
-            # Inisialisasi metadata sesuai tipe
-            if new_data.type == DataType.ENUM:
-                target_meta.options = []
-            elif new_data.type == DataType.ARRAY:
-                target_meta.element_type = DataType.STRING
-            elif new_data.type == DataType.STRUCT:
-                pass  # STRUCT hanya butuh value dict
+                    # Bersihkan metadata lama
+                    child.options = None
+                    child.element_type = None
 
-            # Value selalu reset dari sumber kebenaran
-            VariableManager.convert_variable_to_type(target_meta, new_data.type)
+                    # Inisialisasi metadata sesuai tipe
+                    if new_data.type == DataType.ENUM:
+                        child.options = []
+                    elif new_data.type == DataType.ARRAY:
+                        child.element_type = DataType.STRING
+                    elif new_data.type == DataType.STRUCT:
+                        pass  # STRUCT hanya butuh value dict
+
+                    # Value selalu reset dari sumber kebenaran
+                    VariableManager.convert_variable_to_type(child, new_data.type)
+                else:
+                    Debug.log_error("Attempting to change type of a non-variable child, which is not supported.")
+                    return False
 
         return True
     
