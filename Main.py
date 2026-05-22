@@ -25,6 +25,8 @@ from Core.View.GraphView import GraphView
 from Core.UIPanel.PropertiesPanel import PropertiesPanel
 from Core.UIPanel.GlobalVariablePanel import GlobalVariablePanel
 
+from Core.Graph.LoadNodes import load_all_nodes
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -52,6 +54,9 @@ class MainWindow(QMainWindow):
         self.event_bus.subscribe(EventType.EVENT_EXECUTION_PAUSED.value, self.on_execution_pause)
         self.event_bus.subscribe(EventType.EVENT_EXECUTION_RESUMED.value, self.on_execution_resume)
         self.event_bus.subscribe(EventType.EVENT_EXECUTION_STOPPED.value, self.on_execution_stop)
+
+        # Register all nodes
+        load_all_nodes()
 
         # Executor
         self.node_runner = NodeRunner(self)

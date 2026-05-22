@@ -5,13 +5,18 @@ from PyQt6.QtGui import QColor
 from Core.Debug.Debug import Debug
 from Core.Enums.DataType import DataType
 from Core.Graph.BaseNode import BaseNode
+from Core.Graph.NodeRegistry import register_node
 from Core.Graph.SocketItem import SocketItem
 from Core.Structures.Variable import Variable
 from Core.VariableManager import VariableManager
 
+@register_node
 class PrintNode(BaseNode):
+    NODE_NAME = "Print"
+    CATEGORY = "Utility/Debug"
+
     def __init__(self):
-        super().__init__("Print")
+        super().__init__()
         self.header_color = QColor(50, 50, 200, 200)
         self.add_socket(True, True)
         self.add_socket(False, True)

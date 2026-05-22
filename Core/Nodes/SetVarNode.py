@@ -2,14 +2,19 @@ from typing import Any
 
 from PyQt6.QtGui import QColor
 
+from Core.Graph.NodeRegistry import register_node
 from Core.Structures.Variable import Variable
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
 from Core.Graph.BaseNode import BaseNode
 
+@register_node
 class SetVarNode(BaseNode):
+    NODE_NAME = "Set Variable"
+    CATEGORY = "Variable"
+
     def __init__(self):
-        super().__init__("Set Variable")
+        super().__init__()
         self.header_color = QColor(50, 150, 50, 200)
         self.var_manager = self.main_window.var_manager if self.main_window else None
 

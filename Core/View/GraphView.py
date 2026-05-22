@@ -7,13 +7,10 @@ from PyQt6.QtCore import Qt, QEvent, QSize, QPoint, QPointF
 from PyQt6.QtGui import QKeyEvent, QPainter, QMouseEvent, QIcon, QContextMenuEvent, QAction, QResizeEvent, QWheelEvent, QNativeGestureEvent
 
 from Core.Graph.BaseNode import BaseNode
-from Core.Enums.DataType import DataType
 from Core.Graph.EdgeItem import EdgeItem
+from Core.Graph.NodeRegistry import NODE_REGISTRY
 from Core.Graph.SocketItem import SocketItem
 
-from Core.Nodes.PrintNode import PrintNode
-from Core.Nodes.DialogueNode import DialogueNode
-from Core.Nodes.SetVarNode import SetVarNode
 from Core.Nodes.RerouteNode import RerouteNode
 from Core.View.GraphScene import GraphScene
 
@@ -421,99 +418,113 @@ class GraphView(QGraphicsView):
                 # Bersihkan panel properti jika node yang dihapus sedang ditampilkan
                 self.main_window.properties_panel.clear()
     
-    def _show_context_menu(self, global_pos: QPoint, scene_pos: QPointF, item: QGraphicsItem | None = None, mode: ContextMenuMode = ContextMenuMode.VIEW):
+    def _show_context_menu(
+        self,
+        global_pos: QPoint,
+        scene_pos: QPointF,
+        item: QGraphicsItem | None = None,
+        mode: ContextMenuMode = ContextMenuMode.VIEW
+    ):
+
         scene = self.scene()
+
         if scene is None:
             return
+
         scene = cast(GraphScene, scene)
 
         def _auto_connect_node(node: BaseNode):
+
             start_sock = scene.start_socket
+
             if not start_sock:
                 return
 
-            target_sockets = node.inputs if not start_sock.is_input else node.outputs
+            target_sockets = (
+                node.inputs
+                if not start_sock.is_input
+                else node.outputs
+            )
 
             for target_sock in target_sockets:
-                if self._is_connection_allowed(start_sock, target_sock):
+
+                if self._is_connection_allowed(
+                    start_sock,
+                    target_sock
+                ):
+
                     if start_sock.is_input:
                         target_sock.connect_to(start_sock)
                     else:
                         start_sock.connect_to(target_sock)
+
                     break
 
-        menu, act_dial, act_print, set_var_menu, act_reroute, act_focus, act_zoom_in, act_zoom_out, act_select_all = self._get_context_menu(mode)
+        (
+            menu,
+            node_actions,
+            act_focus,
+            act_zoom_in,
+            act_zoom_out,
+            act_select_all
+        ) = self._get_context_menu(mode)
 
         selected_action = menu.exec(global_pos) # type: ignore
 
-        # === VIEW MODE (klik kanan kosong) ===
-        if mode == ContextMenuMode.VIEW:
-            # === NODE CREATION ACTIONS ===
-            if selected_action == act_dial:
-                self.spawn_node(DialogueNode(), scene_pos)
+        if selected_action is None:
+            return
 
-            elif selected_action and selected_action.parent() == set_var_menu:
-                var_name = selected_action.data()
-                node = SetVarNode()
-                self.spawn_node(node, scene_pos)
-                node.set_property(["Variable"], var_name)
+        # =========================================================
+        # NODE CREATION
+        # =========================================================
 
-            elif selected_action == act_reroute:
-                self.spawn_node(RerouteNode(), scene_pos)
+        if selected_action in node_actions:
 
-            elif selected_action == act_print:
-                self.spawn_node(PrintNode(), scene_pos)
+            node_cls = node_actions[selected_action]
 
-            # === VIEW ACTIONS ===
-            elif selected_action == act_focus:
-                self.resetTransform()
-                self.zoom_level = 0
-                self.centerOn(scene_pos)
+            try:
+                node = node_cls()
 
-            elif selected_action == act_zoom_in:
-                self.zoom_in()
-
-            elif selected_action == act_zoom_out:
-                self.zoom_out()
-
-            # === SELECTION ===
-            elif selected_action == act_select_all:
-                for item in scene.items():
-                    if isinstance(item, BaseNode):
-                        item.setSelected(True)
-
-        # === EDGE DROP MODE ===
-        elif mode == ContextMenuMode.EDGE_DROP:
-            start_sock = scene.start_socket
-            new_node = None
-
-            # === NODE CREATION ACTIONS ===
-            if selected_action == act_dial:
-                new_node = DialogueNode()
-
-            elif selected_action and selected_action.parent() == set_var_menu:
-                var_name = selected_action.data()
-                new_node = SetVarNode()
-                new_node.set_property(["Variable"], var_name)
-
-            elif selected_action == act_reroute:
-                start_sock = scene.start_socket
-                new_node = RerouteNode()
-                new_node = cast(RerouteNode, self.spawn_node(new_node, scene_pos))
-
-                if start_sock:
-                    if start_sock.is_input:
-                        new_node.out_socket.connect_to(start_sock)
-                    else:
-                        start_sock.connect_to(new_node.in_socket)
+            except Exception as e:
+                print(f"Gagal membuat node: {e}")
                 return
-            
-            elif selected_action == act_print:
-                new_node = PrintNode()
 
-            if new_node:
-                new_node = self.spawn_node(new_node, scene_pos)
-                _auto_connect_node(new_node)
+            node = self.spawn_node(node, scene_pos)
+
+            # EDGE DROP MODE
+            if mode == ContextMenuMode.EDGE_DROP:
+                _auto_connect_node(node)
+
+            return
+
+        # =========================================================
+        # VIEW ACTIONS
+        # =========================================================
+
+        if selected_action == act_focus:
+
+            self.resetTransform()
+            self.zoom_level = 0
+            self.centerOn(scene_pos)
+
+        elif selected_action == act_zoom_in:
+
+            self.zoom_in()
+
+        elif selected_action == act_zoom_out:
+
+            self.zoom_out()
+
+        # =========================================================
+        # SELECTION
+        # =========================================================
+
+        elif selected_action == act_select_all:
+
+            for item in scene.items():
+
+                if isinstance(item, BaseNode):
+                    item.setSelected(True)
     
     def _is_connection_allowed(self, out_sock: SocketItem, in_sock: SocketItem):
         # Dasar: Harus beda (Input vs Output) dan Beda Node
@@ -528,79 +539,115 @@ class GraphView(QGraphicsView):
             
         return True
     
-    def _get_context_menu(self, mode: ContextMenuMode = ContextMenuMode.VIEW):
-        def _AddActionTitle(menu: QMenu, title: str):
+    def _get_context_menu(
+        self,
+        mode: ContextMenuMode = ContextMenuMode.VIEW
+    ) -> tuple[QMenu, dict[QAction, type[BaseNode]], QAction | None, QAction | None, QAction | None, QAction | None]:
+
+        def _add_title(menu: QMenu, title: str):
+
             title_action = QAction(title, self)
+
             font = title_action.font()
             font.setBold(True)
+
             title_action.setFont(font)
             title_action.setEnabled(False)
+
             menu.addAction(title_action) # type: ignore
             menu.addSeparator()
-            return title_action
 
-        """Helper untuk membangun menu klik kanan yang dinamis"""
         menu = QMenu()
 
-        # === ADD NODE ===
-        _AddActionTitle(menu, "Add Node")
-        
-        # 1. Menu Dialogue
-        act_dial = menu.addAction("Dialogue Node") # type: ignore
-        
-        # 2. Menu Set Variable (dengan Sub-menu)
-        set_var_menu = menu.addMenu("Set Variable")
-        variables = self.main_window.var_manager.get_all_global_variables()
-        
-        if set_var_menu:
-            if not variables:
-                set_var_menu.setEnabled(False)
-                set_var_menu.setToolTip("Create a variable in the left panel first")
-            else:
-                # Buat sub-menu untuk setiap variabel yang tersedia
-                for var_name in variables.keys():
-                    action = set_var_menu.addAction(f"Set {var_name} ({DataType(variables[var_name].type).value})") # type: ignore
-                    # Kita simpan nama variabel di dalam data action agar bisa diambil nanti
-                    if action:
-                        action.setData(var_name)
-        
-        # 3. Print Node
-        act_print = menu.addAction("Print") # type: ignore
-        
-        # 4. Menu Reroute
+        node_actions: dict[QAction, type[BaseNode]] = {}
+
+        # =========================================================
+        # ADD NODE
+        # =========================================================
+
+        _add_title(menu, "Add Node")
+
+        category_menus: dict[str, QMenu] = {}
+
+        for _, node_cls in sorted(
+            NODE_REGISTRY.items(),
+            key=lambda x: x[0]
+        ):
+            category = getattr(node_cls, "CATEGORY", None)
+
+            # HIDDEN
+            if category == "HIDDEN":
+                continue
+
+            action = QAction(node_cls.NODE_NAME, self)
+            action.setData(node_cls)
+
+            node_actions[action] = node_cls
+
+            # ROOT CATEGORY
+            if not category:
+                menu.addAction(action) # type: ignore
+                continue
+
+            # =========================
+            # NESTED CATEGORY SUPPORT
+            # =========================
+            parts = category.split("/")
+
+            parent_menu = menu
+            path_key = ""
+
+            for part in parts:
+                path_key = f"{path_key}/{part}" if path_key else part
+
+                if path_key not in category_menus:
+                    sub_menu = cast(QMenu, parent_menu.addMenu(part))
+                    if sub_menu:
+                        category_menus[path_key] = sub_menu
+
+                parent_menu = category_menus[path_key]
+
+            parent_menu.addAction(action) # type: ignore
+
+        # =========================================================
+        # VIEW
+        # =========================================================
+
         menu.addSeparator()
-        act_reroute = menu.addAction("Reroute") # type: ignore
 
-        # === VIEW ===
-        _AddActionTitle(menu, "View").setVisible(mode==ContextMenuMode.VIEW) # Hanya tampilkan di mode view
+        _add_title(menu, "View")
 
-        # 1. Focus (Center at cursor position and reset zoom)
         act_focus = menu.addAction("Focus Here") # type: ignore
-        if act_focus:
-            act_focus.setVisible(mode==ContextMenuMode.VIEW)
-        # 2. Zoom In
         act_zoom_in = menu.addAction("Zoom In") # type: ignore
-        if act_zoom_in:
-            act_zoom_in.setVisible(mode==ContextMenuMode.VIEW)
-        # 3. Zoom Out
         act_zoom_out = menu.addAction("Zoom Out") # type: ignore
-        if act_zoom_out:
-            act_zoom_out.setVisible(mode==ContextMenuMode.VIEW)
 
-        # === SELECTION ===
-        _AddActionTitle(menu, "Selection").setVisible(mode==ContextMenuMode.VIEW) # Hanya tampilkan di mode view
+        if mode != ContextMenuMode.VIEW:
 
-        # 1. Select All
+            for act in (
+                act_focus,
+                act_zoom_in,
+                act_zoom_out
+            ):
+                if act:
+                    act.setVisible(False)
+
+        # =========================================================
+        # SELECTION
+        # =========================================================
+
+        menu.addSeparator()
+
+        _add_title(menu, "Selection")
+
         act_select_all = menu.addAction("Select All") # type: ignore
-        if act_select_all:
-            act_select_all.setVisible(mode==ContextMenuMode.VIEW)
-        
+
+        if mode != ContextMenuMode.VIEW:
+            if act_select_all:
+                act_select_all.setVisible(False)
+
         return (
             menu,
-            act_dial,
-            act_print,
-            set_var_menu,
-            act_reroute,
+            node_actions,
             act_focus,
             act_zoom_in,
             act_zoom_out,

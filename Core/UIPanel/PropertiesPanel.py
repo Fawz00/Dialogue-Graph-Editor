@@ -152,7 +152,7 @@ class PropertiesPanel(UIPanelBase):
 
         property_title = QLabel("<b>Properties</b>")
         if self.target_data.type == DataFieldType.Node:
-            node_title = self.target_data.node_obj.title if self.target_data.node_obj else "Unknown"
+            node_title = self.target_data.node_obj.NODE_NAME if self.target_data.node_obj else "Unknown"
             property_title.setText(f"<b>Node: {node_title}</b>")
         elif self.target_data.type == DataFieldType.GlobalVariable:
             property_title.setText(f"<b>Global Variable: {self.target_data.var_name}</b>")

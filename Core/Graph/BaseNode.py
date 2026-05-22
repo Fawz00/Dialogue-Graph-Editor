@@ -21,9 +21,12 @@ if TYPE_CHECKING:
 class BaseNode(QGraphicsItem):
     main_window: MainWindow | None = None
 
-    def __init__(self, title: str = "Node"):
+    NODE_NAME = "Unknown Node"
+    CATEGORY = "HIDDEN"
+
+    def __init__(self):
         super().__init__()
-        self.title = title
+    
         self.is_removable = True
         self.is_valid = True
         self.properties: dict[str, Variable] = {}
@@ -106,7 +109,7 @@ class BaseNode(QGraphicsItem):
         # Title Text
         painter.setPen(STYLES['text_color'])
         painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        painter.drawText(QRectF(10, 0, self.width-20, 30), Qt.AlignmentFlag.AlignVCenter, self.title)
+        painter.drawText(QRectF(10, 0, self.width-20, 30), Qt.AlignmentFlag.AlignVCenter, self.NODE_NAME)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: typing.Any):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
@@ -308,7 +311,7 @@ class BaseNode(QGraphicsItem):
         """Mengubah node menjadi dict untuk disimpan"""
         return {
             "id": id(self),
-            "title": self.title,
+            "title": self.NODE_NAME,
             "pos": (self.pos().x(), self.pos().y()),
             "node_type": self.__class__.__name__,
             "properties": self.properties,

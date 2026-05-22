@@ -2,13 +2,18 @@ from typing import Any
 
 from PyQt6.QtGui import QColor
 
+from Core.Graph.NodeRegistry import register_node
 from Core.Structures.Variable import Variable
 from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
 
+@register_node
 class DialogueNode(BaseNode):
+    NODE_NAME = "Dialogue"
+    CATEGORY = "Dialogue"
+
     def __init__(self):
-        super().__init__("Dialogue")
+        super().__init__()
         self.header_color = QColor(50, 100, 200, 200) # Biru
         self.properties = {
             "speaker": Variable(

@@ -168,7 +168,7 @@ class NodeRunner(QThread):
         self.request_stop()
 
     def _execute_node(self, node: BaseNode):
-        Debug.log_debug(f"Executing node: {node.title}")
+        Debug.log_debug(f"Executing node: {node.NODE_NAME}")
 
         self.current_node = node
 

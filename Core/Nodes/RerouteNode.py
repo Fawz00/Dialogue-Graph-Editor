@@ -4,11 +4,16 @@ from PyQt6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 from Core.Graph.BaseNode import BaseNode
 from Core.Enums.DataType import DataType
+from Core.Graph.NodeRegistry import register_node
 from Style import STYLES, DATA_TYPE_COLORS
 
+@register_node
 class RerouteNode(BaseNode):
+    NODE_NAME = "Reroute"
+    CATEGORY = ""
+
     def __init__(self, is_exec: bool = True, socket_data_type: DataType | None = None):
-        super().__init__("Reroute")
+        super().__init__()
         self.radius = 16
         self.width = 20
         self.height = 20

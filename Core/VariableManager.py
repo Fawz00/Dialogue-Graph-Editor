@@ -229,6 +229,8 @@ class VariableManager(QObject):
 
         parent, key, child = get_nested_var(value_path)
 
+        # Debug.log(f"Editing variable at path '{value_path}':\n\nparent='{parent}',\n\nkey='{key}',\n\nchild='{child}'")
+
         if child is None:
             Debug.log_error(f"Failed to get child for path '{value_path}'.")
             return False
@@ -280,23 +282,25 @@ class VariableManager(QObject):
                     # List element tidak perlu validasi parent karena List bisa menampung berbagai tipe, validasi langsung pada elementnya saja
                 
                 # Tipe primitif tidak harus validasi parent
-                # PRIMITIVE
-                target_var = cast(Variable, child)
-                old_val = target_var.value
 
-                # Coba pasang dulu
-                target_var.value = new_data.value
+                if not (parent is not None and parent.type == DataType.ARRAY):
+                    # PRIMITIVE & LIST element change
+                    target_var = cast(Variable, child)
+                    old_val = target_var.value
 
-                # Validasi
-                if not VariableManager.is_value_valid(target_var):
-                    # Rollback jika invalid
-                    target_var.value = old_val
+                    # Coba pasang dulu
+                    target_var.value = new_data.value
 
-                    Debug.log_warning(f"Invalid value '{target_var.value}' for type {target_var.type}.")
-
-                    # Cek apakah value lama valid, kalau tidak set ke default
+                    # Validasi
                     if not VariableManager.is_value_valid(target_var):
-                        VariableManager.reset_to_default_value(target_var)
+                        # Rollback jika invalid
+                        target_var.value = old_val
+
+                        Debug.log_warning(f"Invalid value '{target_var.value}' for type {target_var.type}.")
+
+                        # Cek apakah value lama valid, kalau tidak set ke default
+                        if not VariableManager.is_value_valid(target_var):
+                            VariableManager.reset_to_default_value(target_var)
 
             # =========================
             # CHANGE OTHER PROPS
