@@ -34,24 +34,24 @@ class DialogueNode(BaseNode):
             )
         }
         
-        self.add_socket(True, True) # Input flow
+        self.add_exec_socket(True) # Input flow
         self._setup_inline_editors()
         self.refresh_outputs()
 
     def refresh_outputs(self):
         # Hapus socket output lama (secara logika sederhana)
         # Di aplikasi real, perlu cleanup edge yang terhubung
-        for s in self.outputs:
+        for s in self.exec_outputs:
             scene = self.scene()
             if scene is not None:
                 scene.removeItem(s)
-        self.outputs.clear()
+        self.exec_outputs.clear()
         
         # Buat socket baru berdasarkan pilihan
         if isinstance(self.properties["choices"].value, list): # Expected: list[str]
             for choice in self.properties["choices"].value:
                 if isinstance(choice, str):
-                    self.add_socket(False, True, label=choice)
+                    self.add_exec_socket(False, label=choice)
 
     def get_properties(self):
         return self.properties
@@ -63,9 +63,9 @@ class DialogueNode(BaseNode):
             self.refresh_outputs()
     
     def _setup_inline_editors(self):
-        speaker = self.add_socket(True, False, DataType.STRING)
-        text = self.add_socket(True, False, DataType.STRING)
-        choices = self.add_socket(True, False, DataType.ARRAY)
+        speaker = self.add_data_socket(True, DataType.STRING)
+        text = self.add_data_socket(True, DataType.STRING)
+        choices = self.add_data_socket(True, DataType.ARRAY)
 
         self.add_inline_input(speaker, "speaker")
         self.add_inline_input(text, "text")

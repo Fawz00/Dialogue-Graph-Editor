@@ -13,13 +13,13 @@ from Core.VariableManager import VariableManager
 @register_node
 class PrintNode(BaseNode):
     NODE_NAME = "Print"
-    CATEGORY = "Utility/Debug"
+    CATEGORY = "Utility"
 
     def __init__(self):
         super().__init__()
         self.header_color = QColor(50, 50, 200, 200)
-        self.add_socket(True, True)
-        self.add_socket(False, True)
+        self.add_exec_socket(True)
+        self.add_exec_socket(False)
 
         self.in_data = None
 
@@ -51,4 +51,4 @@ class PrintNode(BaseNode):
     
     def execute(self) -> SocketItem:
         Debug.log(f"{self.properties['out'].value}")
-        return self.outputs[0]  # Return the output socket
+        return self.exec_outputs[0]  # Return the output socket

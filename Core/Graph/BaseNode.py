@@ -14,6 +14,7 @@ from Core.Graph.SocketItem import SocketItem
 from Core.Debug.Debug import Debug
 from Core.VariableManager import VariableManager
 from Core.Structures.Variable import ValueType, Variable
+from Core.Execution.RuntimeNodeRegistry import RUNTIME_NODE_REGISTRY
 
 if TYPE_CHECKING:
     from Main import MainWindow
@@ -27,6 +28,7 @@ class BaseNode(QGraphicsItem):
     def __init__(self):
         super().__init__()
     
+        self._id = id(self)
         self.is_removable = True
         self.is_valid = True
         self.properties: dict[str, Variable] = {}
@@ -35,9 +37,13 @@ class BaseNode(QGraphicsItem):
         self.height = 80
         self.socket_spacing = 25 # default: 25, 40 better for inline
 
-        # Sockets
-        self.inputs: list[SocketItem] = []
-        self.outputs: list[SocketItem] = []
+        # Exec Sockets
+        self.exec_inputs: list[SocketItem] = []
+        self.exec_outputs: list[SocketItem] = []
+
+        # Data Sockets
+        self.data_inputs: list[SocketItem] = []
+        self.data_outputs: list[SocketItem] = []
 
         # Inline Inputs and Proxy Widgets
         self.inline_inputs: dict[SocketItem, InlineInput] = {}
@@ -49,6 +55,8 @@ class BaseNode(QGraphicsItem):
         
         # Header Color (bisa di override per tipe node)
         self.header_color = STYLES['node_header']
+
+        RUNTIME_NODE_REGISTRY[self._id] = self
 
     # ========== Qt Overrides ==========
     #region Qt Overrides
@@ -114,7 +122,7 @@ class BaseNode(QGraphicsItem):
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: typing.Any):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             # Update edges connected to this node
-            for sock in self.inputs + self.outputs:
+            for sock in self.exec_inputs + self.exec_outputs + self.data_inputs + self.data_outputs:
                 for edge in sock.edges:
                     edge.update_path()
         return super().itemChange(change, value)
@@ -126,12 +134,24 @@ class BaseNode(QGraphicsItem):
     # ========== Node Methods ==========
     # region Socket Management
 
-    def add_socket(self, is_input: bool, is_exec: bool = True, data_type: DataType | None = None, label: str = "", prop_reference_path: list[str] = []) -> SocketItem:
-        socket = SocketItem(self, len(self.inputs) if is_input else len(self.outputs), is_input, is_exec=is_exec, data_type=data_type, label=label, prop_reference_path=prop_reference_path)
+    def get_id(self):
+        return self._id
+
+    def add_exec_socket(self, is_input: bool, label: str = "") -> SocketItem:
+        socket = SocketItem(self, len(self.exec_inputs) if is_input else len(self.exec_outputs), is_input, is_exec=True, data_type=None, label=label, prop_reference_path=[])
         if is_input:
-            self.inputs.append(socket)
+            self.exec_inputs.append(socket)
         else:
-            self.outputs.append(socket)
+            self.exec_outputs.append(socket)
+        self._update_socket_positions()
+        return socket
+    
+    def add_data_socket(self, is_input: bool, data_type: DataType = DataType.STRING, label: str = "", prop_reference_path: list[str] = []) -> SocketItem:
+        socket = SocketItem(self, len(self.data_inputs) if is_input else len(self.data_outputs), is_input, is_exec=False, data_type=data_type, label=label, prop_reference_path=prop_reference_path)
+        if is_input:
+            self.data_inputs.append(socket)
+        else:
+            self.data_outputs.append(socket)
         self._update_socket_positions()
         return socket
 
@@ -144,10 +164,14 @@ class BaseNode(QGraphicsItem):
 
     def remove_socket(self, socket: SocketItem):
         """Menghapus socket secara bersih dari list dan scene"""
-        if socket in self.inputs:
-            self.inputs.remove(socket)
-        if socket in self.outputs:
-            self.outputs.remove(socket)
+        if socket in self.exec_inputs:
+            self.exec_inputs.remove(socket)
+        if socket in self.exec_outputs:
+            self.exec_outputs.remove(socket)
+        if socket in self.data_inputs:
+            self.data_inputs.remove(socket)
+        if socket in self.data_outputs:
+            self.data_outputs.remove(socket)
         if socket in self.inline_inputs:
             self.inline_inputs[socket].destroy()
             del self.inline_inputs[socket]
@@ -157,19 +181,18 @@ class BaseNode(QGraphicsItem):
     
     def clear_sockets(self):
         """Menghapus semua socket dari node"""
-        for sock in self.inputs + self.outputs:
+        for sock in self.exec_inputs + self.exec_outputs + self.data_inputs + self.data_outputs:
             sock.destroy()
         
-        self.inputs = []
-        self.outputs = []
+        self.exec_inputs = []
+        self.exec_outputs = []
+        self.data_inputs = []
+        self.data_outputs = []
         self._update_socket_positions()
     
     def validate_socket_connections(self):
         """Memutus kabel jika tipe data socket berubah dan tidak cocok dengan kabelnya"""
-        for socket in self.inputs + self.outputs:
-            if socket.is_exec:
-                continue # Lewati alur eksekusi
-            
+        for socket in self.data_inputs + self.data_outputs:
             for edge in socket.edges[:]:
                 # Ambil socket lawan
                 other_socket = edge.start_socket if edge.end_socket == socket else edge.end_socket
@@ -183,17 +206,17 @@ class BaseNode(QGraphicsItem):
 
     def _update_socket_positions(self):
         # Hitung tinggi node berdasarkan jumlah socket
-        count_in = len(self.inputs)
-        count_out = len(self.outputs)
+        count_in = len(self.data_inputs) + len(self.exec_inputs)
+        count_out = len(self.data_outputs) + len(self.exec_outputs)
         max_sockets = max(count_in, count_out)
         
         self.height = max(self.height, 40 + (max_sockets * self.socket_spacing))
         
         y_start = 45
-        for i, sock in enumerate(self.inputs):
+        for i, sock in enumerate(self.exec_inputs + self.data_inputs):
             sock.setPos(0, y_start + (i * self.socket_spacing))
             
-        for i, sock in enumerate(self.outputs):
+        for i, sock in enumerate(self.exec_outputs + self.data_outputs):
             sock.setPos(self.width, y_start + (i * self.socket_spacing))
             
         self.update() # Redraw
@@ -208,7 +231,7 @@ class BaseNode(QGraphicsItem):
             Debug.log_error(f"Variable not found for path: {prop_var_path}")
             return None
 
-        return self.add_socket(is_input=True, is_exec=False, data_type=DataType(var.type), label=f"{prop_var_path[-1]}", prop_reference_path=prop_var_path)
+        return self.add_data_socket(is_input=True, data_type=DataType(var.type), label=f"{prop_var_path[-1]}", prop_reference_path=prop_var_path)
 
     #endregion Socket Management
 
@@ -266,7 +289,7 @@ class BaseNode(QGraphicsItem):
                 continue
 
             try:
-                index = self.inputs.index(sock)
+                index = self.data_inputs.index(sock)
             except ValueError:
                 # Socket might already be removed/deleted from inputs
                 inline.set_visible(False)
@@ -280,6 +303,9 @@ class BaseNode(QGraphicsItem):
     def destroy(self):
         # Hapus semua socket
         self.clear_sockets()
+
+        RUNTIME_NODE_REGISTRY.pop(self._id, None)
+
         # Hapus node dari scene
         scene = self.scene()
         if scene is not None:
@@ -316,13 +342,13 @@ class BaseNode(QGraphicsItem):
             "node_type": self.__class__.__name__,
             "properties": self.properties,
             "sockets": {
-                "inputs": [sock.serialize() for sock in self.inputs],
-                "outputs": [sock.serialize() for sock in self.outputs]
+                "inputs": [sock.serialize() for sock in self.data_inputs + self.exec_inputs],
+                "outputs": [sock.serialize() for sock in self.data_outputs + self.exec_outputs]
             }
         }
 
     def execute(self) -> SocketItem | None:
         """Override ini untuk menjalankan logika node saat dieksekusi"""
-        return self.outputs[0] if self.outputs else None # Default: langsung ke output pertama (jika ada)
+        return self.exec_outputs[0] if self.exec_outputs else None # Default: langsung ke output pertama (jika ada)
     
     #endregion Node Methods

@@ -12,7 +12,7 @@ class RerouteNode(BaseNode):
     NODE_NAME = "Reroute"
     CATEGORY = ""
 
-    def __init__(self, is_exec: bool = True, socket_data_type: DataType | None = None):
+    def __init__(self, socket_data_type: DataType | None = None):
         super().__init__()
         self.radius = 16
         self.width = 20
@@ -22,8 +22,12 @@ class RerouteNode(BaseNode):
         self.is_removable = True
         
         # Hanya butuh satu input dan satu output
-        self.in_socket = self.add_socket(True, is_exec=is_exec, data_type=socket_data_type)
-        self.out_socket = self.add_socket(False, is_exec=is_exec, data_type=socket_data_type)
+        if socket_data_type is not None:
+            self.in_socket = self.add_data_socket(True, data_type=socket_data_type)
+            self.out_socket = self.add_data_socket(False, data_type=socket_data_type)
+        else:
+            self.in_socket = self.add_exec_socket(True)
+            self.out_socket = self.add_exec_socket(False)
 
     def paint(self, painter: QPainter | None, option: QStyleOptionGraphicsItem | None, widget: QWidget | None = None):
         # Visual reroute lebih simpel (hanya lingkaran kecil atau kotak)

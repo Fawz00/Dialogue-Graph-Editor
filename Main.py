@@ -363,22 +363,26 @@ class MainWindow(QMainWindow):
                           "Created with PyQt6.")
     
     def quit_application(self):
-        reply = QMessageBox.question(
-            self,
-            "Confirm Quit",
-            "Are you sure you want to quit?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            QApplication.quit()
+        self.close()
 
     def closeEvent(self, a0: QCloseEvent | None):
         if a0 is None:
             super().closeEvent(a0)
             return
 
-        if self.quit_application():
+        reply = QMessageBox.question(
+            self,
+            "Confirm Quit",
+            "Are you sure you want to quit?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.node_runner.running:
+                self.node_runner.request_stop()
+
             a0.accept()
+            QApplication.quit()
         else:
             a0.ignore()
 

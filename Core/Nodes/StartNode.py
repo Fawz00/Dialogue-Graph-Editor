@@ -12,4 +12,4 @@ class StartNode(BaseNode):
         super().__init__()
         self.is_removable = False
         self.header_color = QColor(200, 50, 50, 200) # Merah
-        self.add_socket(False, True) # Output only
+        self.add_exec_socket(False) # Output only

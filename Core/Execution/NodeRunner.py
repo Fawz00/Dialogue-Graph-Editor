@@ -179,7 +179,7 @@ class NodeRunner(QThread):
         edge = None
 
         if prev_node:
-            for out_sock in prev_node.outputs:
+            for out_sock in prev_node.exec_outputs:
                 for e in out_sock.edges:
                     if (
                         e.start_socket.parent_node == prev_node
@@ -199,7 +199,9 @@ class NodeRunner(QThread):
         if len(self.stack_trace) > self.max_stack_size:
             self.stack_trace.pop(0)
 
-        if not next_socket or not next_socket.is_exec:
+        if next_socket is None or not next_socket.is_exec:
+            if next_socket is not None and not next_socket.is_exec:
+                Debug.log_error(f"Node '{node.NODE_NAME}' did not return a valid execution socket.")
             self.request_stop()
             return
 

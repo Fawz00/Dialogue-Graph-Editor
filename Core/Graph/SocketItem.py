@@ -186,8 +186,10 @@ class SocketItem(QGraphicsItem):
     
         # Hapus referensi node induk
         if self.parent_node:
-            self.parent_node.inputs = [s for s in self.parent_node.inputs if s != self]
-            self.parent_node.outputs = [s for s in self.parent_node.outputs if s != self]
+            self.parent_node.exec_inputs = [s for s in self.parent_node.exec_inputs if s != self]
+            self.parent_node.data_inputs = [s for s in self.parent_node.data_inputs if s != self]
+            self.parent_node.exec_outputs = [s for s in self.parent_node.exec_outputs if s != self]
+            self.parent_node.data_outputs = [s for s in self.parent_node.data_outputs if s != self]
 
             self.parent_node = None
         

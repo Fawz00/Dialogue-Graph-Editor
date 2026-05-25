@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (QGraphicsItem, QGraphicsView, QMenu, QToolButton)
 from PyQt6.QtCore import Qt, QEvent, QSize, QPoint, QPointF
 from PyQt6.QtGui import QKeyEvent, QPainter, QMouseEvent, QIcon, QContextMenuEvent, QAction, QResizeEvent, QWheelEvent, QNativeGestureEvent
 
+from Core.Debug.Debug import Debug
 from Core.Graph.BaseNode import BaseNode
 from Core.Graph.EdgeItem import EdgeItem
 from Core.Graph.NodeRegistry import NODE_REGISTRY
@@ -439,11 +440,23 @@ class GraphView(QGraphicsView):
 
             if not start_sock:
                 return
+            
+            if type(node) == RerouteNode:
+                if start_sock:
+                    if start_sock.is_input:
+                        node.out_socket.connect_to(start_sock)
+                    else:
+                        data_type_target = start_sock.data_type if start_sock.data_type is not None else None
+                        node.in_socket.change_type(True if data_type_target is None else False, data_type=data_type_target)
+                        node.out_socket.change_type(True if data_type_target is None else False, data_type=data_type_target)
+                        
+                        start_sock.connect_to(node.in_socket)
+                return
 
             target_sockets = (
-                node.inputs
+                node.exec_inputs + node.data_inputs
                 if not start_sock.is_input
-                else node.outputs
+                else node.exec_outputs + node.data_outputs
             )
 
             for target_sock in target_sockets:
@@ -486,7 +499,7 @@ class GraphView(QGraphicsView):
                 node = node_cls()
 
             except Exception as e:
-                print(f"Gagal membuat node: {e}")
+                Debug.log_error(f"Failed to create node '{node_cls.NODE_NAME}': {e}")
                 return
 
             node = self.spawn_node(node, scene_pos)
@@ -674,7 +687,7 @@ class GraphView(QGraphicsView):
         s_type = start_socket.data_type
 
         # 1. Buat Reroute Node baru
-        reroute = RerouteNode(is_exec=s_exec, socket_data_type=s_type)
+        reroute = RerouteNode(socket_data_type=s_type if not s_exec else None)
         reroute.setPos(pos.x() - 10, pos.y() - 10)
 
         scene = self.scene()

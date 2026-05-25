@@ -1,4 +1,5 @@
-from typing import Any
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any
 
 from PyQt6.QtGui import QColor
 
@@ -7,6 +8,9 @@ from Core.Structures.Variable import Variable
 from Core.Enums.DataType import DataType
 from Core.VariableManager import VariableManager
 from Core.Graph.BaseNode import BaseNode
+
+if TYPE_CHECKING:
+    from Core.Graph.SocketItem import SocketItem
 
 @register_node
 class SetVarNode(BaseNode):
@@ -19,11 +23,11 @@ class SetVarNode(BaseNode):
         self.var_manager = self.main_window.var_manager if self.main_window else None
 
         # 1. Socket Alur (Exec)
-        self.add_socket(True, True)
-        self.add_socket(False, True)
+        self.add_exec_socket(True)
+        self.add_exec_socket(False)
 
-        self.in_data = None
-        self.out_data = None
+        self.in_data: SocketItem | None = None
+        self.out_data: SocketItem | None = None
 
         self.properties = {
             "Variable": Variable(
@@ -98,12 +102,12 @@ class SetVarNode(BaseNode):
             self.title = f"Set {var_name}"
 
             if self.in_data is None:
-                self.in_data = self.add_socket(True, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})", prop_reference_path=["Value"])
+                self.in_data = self.add_data_socket(True, data_type=v_type, label=f"Value ({v_type.value})", prop_reference_path=["Value"])
             else:
                 self.in_data = self.change_socket(self.in_data, is_exec=False, data_type=v_type, label=f"Value ({v_type.value})", prop_reference_path=["Value"])
             
             if self.out_data is None:
-                self.out_data = self.add_socket(False, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})", prop_reference_path=["Value"])
+                self.out_data = self.add_data_socket(False, data_type=v_type, label=f"Out ({v_type.value})", prop_reference_path=["Value"])
             else:
                 self.out_data = self.change_socket(self.out_data, is_exec=False, data_type=v_type, label=f"Out ({v_type.value})", prop_reference_path=["Value"])
             
